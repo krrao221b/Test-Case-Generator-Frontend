@@ -1,0 +1,137 @@
+# AI Test Case Generator - Git Ignore File
+# This file specifies which files and directories should NOT be tracked by Git
+# IMPORTANT: Never commit node_modules, .env files, or build artifacts to version control
+
+# ============================================================================
+# DEPENDENCIES - Never commit these to Git!
+# ============================================================================
+# Node.js dependencies (contains thousands of files, should be installed via npm install)
+node_modules
+**/node_modules
+.pnp
+.pnp.*
+
+# Yarn dependency management
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Package manager lock files (optional - team decision)
+# Uncomment the next line if you want to ignore lock files
+# package-lock.json
+
+# ============================================================================
+# BUILD OUTPUTS - Generated files that shouldn't be in version control
+# ============================================================================
+# Production builds
+build
+dist
+out
+
+# Next.js specific
+.next/
+
+# Vite build outputs
+frontend/dist
+
+# ============================================================================
+# ENVIRONMENT & CONFIGURATION - Contains sensitive data!
+# ============================================================================
+# Environment variables (may contain API keys, passwords, etc.)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+
+# IDE and editor configurations (optional - team preference)
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ============================================================================
+# TESTING & COVERAGE
+# ============================================================================
+# Test coverage reports
+coverage
+*.lcov
+
+# ============================================================================
+# LOGS & DEBUG FILES
+# ============================================================================
+# NPM logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Runtime logs
+logs
+*.log
+
+# ============================================================================
+# OPERATING SYSTEM FILES
+# ============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.tmp
+*.temp
+Desktop.ini
+
+# Linux
+*~
+
+# ============================================================================
+# TYPESCRIPT & BUILD TOOLS
+# ============================================================================
+# TypeScript build info
+*.tsbuildinfo
+next-env.d.ts
+
+# ============================================================================
+# DEPLOYMENT & CLOUD SERVICES
+# ============================================================================
+# Vercel
+.vercel
+
+# ============================================================================
+# SECURITY & CERTIFICATES
+# ============================================================================
+# SSL certificates and private keys
+.pem
+.key
+.crt
+
+# ============================================================================
+# PROJECT SPECIFIC (AI Test Generator)
+# ============================================================================
+# Temporary files
+temp/
+tmp/
+
+# Cache directories
+.cache/
+.parcel-cache/
+
+# Editor backup files
+.bak
+.backup
+
+# AI model files (if storing locally - usually too large for git)
+.model
+.weights
+
+# Test data files (if containing sensitive information)
+test-data/sensitive/
