@@ -1,6 +1,11 @@
-import { apiClient } from './apiClient';
-import { API_ENDPOINTS } from '../constants';
-import type { TestCase, ZephyrPushRequest, ZephyrPushResponse } from '../types';
+import { apiClient } from "./apiClient";
+import { API_ENDPOINTS } from "../constants";
+import type {
+  TestCase,
+  TestStep,
+  ZephyrPushRequest,
+  ZephyrPushResponse,
+} from "../types";
 
 /**
  * Service for Zephyr Scale integration
@@ -9,7 +14,9 @@ export class ZephyrService {
   /**
    * Push test cases to Zephyr Scale
    */
-  static async pushTestCases(request: ZephyrPushRequest): Promise<ZephyrPushResponse> {
+  static async pushTestCases(
+    request: ZephyrPushRequest
+  ): Promise<ZephyrPushResponse> {
     try {
       const response = await apiClient.post<ZephyrPushResponse>(
         API_ENDPOINTS.ZEPHYR_PUSH,
@@ -17,12 +24,14 @@ export class ZephyrService {
       );
 
       if (!response.success) {
-        throw new Error(response.error || 'Failed to push test cases to Zephyr');
+        throw new Error(
+          response.error || "Failed to push test cases to Zephyr"
+        );
       }
 
       return response.data!;
     } catch (error) {
-      console.error('Error pushing test cases to Zephyr:', error);
+      console.error("Error pushing test cases to Zephyr:", error);
       throw error;
     }
   }
@@ -30,19 +39,21 @@ export class ZephyrService {
   /**
    * Get available Zephyr projects
    */
-  static async getProjects(): Promise<Array<{ id: string; key: string; name: string }>> {
+  static async getProjects(): Promise<
+    Array<{ id: string; key: string; name: string }>
+  > {
     try {
-      const response = await apiClient.get<Array<{ id: string; key: string; name: string }>>(
-        API_ENDPOINTS.ZEPHYR_PROJECTS
-      );
+      const response = await apiClient.get<
+        Array<{ id: string; key: string; name: string }>
+      >(API_ENDPOINTS.ZEPHYR_PROJECTS);
 
       if (!response.success) {
-        throw new Error(response.error || 'Failed to fetch Zephyr projects');
+        throw new Error(response.error || "Failed to fetch Zephyr projects");
       }
 
       return response.data || [];
     } catch (error) {
-      console.error('Error fetching Zephyr projects:', error);
+      console.error("Error fetching Zephyr projects:", error);
       throw error;
     }
   }
@@ -52,17 +63,17 @@ export class ZephyrService {
    */
   static formatTestCaseForZephyr(testCase: TestCase): any {
     return {
-      name: testCase.name,
+      name: testCase.title,
       description: testCase.description,
-      precondition: testCase.preconditions || '',
+      precondition: testCase.preconditions || "",
       priority: testCase.priority,
-      estimatedTime: testCase.estimatedTime || 0,
-      labels: testCase.labels || [],
-      testSteps: testCase.steps.map((step: any, index: number) => ({
+      estimatedTime: 0, // Default since TestCase doesn't have this field
+      labels: testCase.tags || [],
+      testSteps: testCase.test_steps.map((step: TestStep, index: number) => ({
         index: index + 1,
         description: step.action,
-        testData: step.testData || '',
-        expectedResult: step.expectedResult,
+        testData: step.test_data || "",
+        expectedResult: step.expected_result,
       })),
     };
   }
@@ -74,33 +85,39 @@ export class ZephyrService {
     const errors: string[] = [];
 
     if (!testCases || testCases.length === 0) {
-      errors.push('No test cases to push');
+      errors.push("No test cases to push");
       return errors;
     }
 
     testCases.forEach((testCase, index) => {
       const testCaseNumber = index + 1;
 
-      if (!testCase.name?.trim()) {
-        errors.push(`Test case ${testCaseNumber}: Name is required`);
+      if (!testCase.title?.trim()) {
+        errors.push(`Test case ${testCaseNumber}: Title is required`);
       }
 
       if (!testCase.description?.trim()) {
         errors.push(`Test case ${testCaseNumber}: Description is required`);
       }
 
-      if (!testCase.steps || testCase.steps.length === 0) {
-        errors.push(`Test case ${testCaseNumber}: At least one test step is required`);
+      if (!testCase.test_steps || testCase.test_steps.length === 0) {
+        errors.push(
+          `Test case ${testCaseNumber}: At least one test step is required`
+        );
       } else {
-        testCase.steps.forEach((step: any, stepIndex: number) => {
+        testCase.test_steps.forEach((step: TestStep, stepIndex: number) => {
           const stepNumber = stepIndex + 1;
-          
+
           if (!step.action?.trim()) {
-            errors.push(`Test case ${testCaseNumber}, Step ${stepNumber}: Action is required`);
+            errors.push(
+              `Test case ${testCaseNumber}, Step ${stepNumber}: Action is required`
+            );
           }
-          
-          if (!step.expectedResult?.trim()) {
-            errors.push(`Test case ${testCaseNumber}, Step ${stepNumber}: Expected result is required`);
+
+          if (!step.expected_result?.trim()) {
+            errors.push(
+              `Test case ${testCaseNumber}, Step ${stepNumber}: Expected result is required`
+            );
           }
         });
       }
@@ -119,19 +136,22 @@ export class ZephyrService {
   static estimatePushTime(testCaseCount: number): string {
     const baseTime = 2; // seconds per test case
     const totalSeconds = testCaseCount * baseTime;
-    
+
     if (totalSeconds < 60) {
       return `${totalSeconds} seconds`;
     } else {
       const minutes = Math.ceil(totalSeconds / 60);
-      return `${minutes} minute${minutes > 1 ? 's' : ''}`;
+      return `${minutes} minute${minutes > 1 ? "s" : ""}`;
     }
   }
 
   /**
    * Create push summary for user confirmation
    */
-  static createPushSummary(testCases: TestCase[], projectKey: string): {
+  static createPushSummary(
+    testCases: TestCase[],
+    projectKey: string
+  ): {
     totalTestCases: number;
     estimatedTime: string;
     projectKey: string;
@@ -141,7 +161,7 @@ export class ZephyrService {
       totalTestCases: testCases.length,
       estimatedTime: this.estimatePushTime(testCases.length),
       projectKey,
-      testCaseNames: testCases.map(tc => tc.name),
+      testCaseNames: testCases.map((tc) => tc.title),
     };
   }
 }

@@ -14,44 +14,48 @@ export interface JiraTicket {
 }
 
 export interface TestStep {
-  id?: string;
-  stepNumber: number;
+  step_number: number;
   action: string;
-  testData: string;
-  expectedResult: string;
+  expected_result: string;
+  test_data?: string;
 }
 
 export interface TestCase {
-  id?: string;
-  name: string;
+  id?: number;
+  title: string;
   description: string;
+  feature_description: string;
+  acceptance_criteria: string;
+  priority: "low" | "medium" | "high" | "critical";
+  tags: string[];
   preconditions?: string;
-  steps: TestStep[];
-  priority: 'Low' | 'Medium' | 'High' | 'Critical';
-  estimatedTime?: number;
-  labels?: string[];
-  jiraTicketId?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  test_steps: TestStep[];
+  expected_result: string;
+  status?: "draft" | "active" | "deprecated";
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+  jira_issue_key?: string;
+  zephyr_test_id?: string;
 }
 
 export interface GenerateTestCaseRequest {
-  type: 'manual' | 'jira';
-  jiraTicketId?: string;
-  jiraUrl?: string;
-  manualInput?: {
-    acceptanceCriteria: string;
-    featureRequirements: string;
-    description: string;
-  };
+  feature_description: string;
+  acceptance_criteria: string;
+  additional_context?: string;
+  priority?: "low" | "medium" | "high" | "critical";
+  tags?: string[];
+}
+
+export interface SimilarTestCase {
+  test_case: TestCase;
+  similarity_score: number;
 }
 
 export interface GenerateTestCaseResponse {
-  success: boolean;
-  testCases: TestCase[];
-  similarTestCases?: TestCase[];
-  message?: string;
-  error?: string;
+  test_case: TestCase;
+  similar_cases: SimilarTestCase[];
+  generation_metadata: { [key: string]: any };
 }
 
 export interface ZephyrPushRequest {
@@ -65,7 +69,7 @@ export interface ZephyrPushResponse {
   pushedTestCases: Array<{
     localId: string;
     zephyrId: string;
-    status: 'success' | 'failed';
+    status: "success" | "failed";
     error?: string;
   }>;
   message?: string;
@@ -106,6 +110,6 @@ export interface User {
 export interface AppSettings {
   darkMode: boolean;
   autoSave: boolean;
-  defaultPriority: TestCase['priority'];
+  defaultPriority: TestCase["priority"];
   maxSimilarTestCases: number;
 }

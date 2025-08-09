@@ -1,11 +1,10 @@
-import { apiClient } from './apiClient';
-import { API_ENDPOINTS } from '../constants';
-import type { 
-  GenerateTestCaseRequest, 
+import { apiClient } from "./apiClient";
+import { API_ENDPOINTS } from "../constants";
+import type {
+  GenerateTestCaseRequest,
   GenerateTestCaseResponse,
   TestCase,
-  ApiResponse 
-} from '../types';
+} from "../types";
 
 /**
  * Service for AI-powered test case generation
@@ -14,7 +13,9 @@ export class TestCaseService {
   /**
    * Generate test cases using AI based on input type
    */
-  static async generateTestCases(request: GenerateTestCaseRequest): Promise<GenerateTestCaseResponse> {
+  static async generateTestCases(
+    request: GenerateTestCaseRequest
+  ): Promise<GenerateTestCaseResponse> {
     try {
       const response = await apiClient.post<GenerateTestCaseResponse>(
         API_ENDPOINTS.GENERATE_TEST_CASES,
@@ -22,11 +23,15 @@ export class TestCaseService {
       );
 
       if (!response.success) {
-        throw new Error(response.error || 'Failed to generate test cases');
+        throw new Error(response.error || "Failed to generate test cases");
       }
 
       // Check if response.data contains the actual GenerateTestCaseResponse
-      if (response.data && typeof response.data === 'object' && 'testCases' in response.data) {
+      if (
+        response.data &&
+        typeof response.data === "object" &&
+        "test_case" in response.data
+      ) {
         return response.data as GenerateTestCaseResponse;
       }
 
@@ -36,9 +41,14 @@ export class TestCaseService {
         return dataAsAny.data as GenerateTestCaseResponse;
       }
 
-      throw new Error('Invalid response format from server');
+      // If the backend returns the data directly (not wrapped in ApiResponse)
+      if (response.data && typeof response.data === "object") {
+        return response.data as GenerateTestCaseResponse;
+      }
+
+      throw new Error("Invalid response format from server");
     } catch (error) {
-      console.error('Error generating test cases:', error);
+      console.error("Error generating test cases:", error);
       throw error;
     }
   }
@@ -48,15 +58,17 @@ export class TestCaseService {
    */
   static async getAllTestCases(): Promise<TestCase[]> {
     try {
-      const response = await apiClient.get<TestCase[]>(API_ENDPOINTS.TEST_CASES);
-      
+      const response = await apiClient.get<TestCase[]>(
+        API_ENDPOINTS.TEST_CASES
+      );
+
       if (!response.success) {
-        throw new Error(response.error || 'Failed to fetch test cases');
+        throw new Error(response.error || "Failed to fetch test cases");
       }
 
       return response.data || [];
     } catch (error) {
-      console.error('Error fetching test cases:', error);
+      console.error("Error fetching test cases:", error);
       throw error;
     }
   }
@@ -71,12 +83,12 @@ export class TestCaseService {
       );
 
       if (!response.success) {
-        throw new Error(response.error || 'Failed to fetch test case');
+        throw new Error(response.error || "Failed to fetch test case");
       }
 
       return response.data!;
     } catch (error) {
-      console.error('Error fetching test case:', error);
+      console.error("Error fetching test case:", error);
       throw error;
     }
   }
@@ -86,21 +98,21 @@ export class TestCaseService {
    */
   static async saveTestCase(testCase: Partial<TestCase>): Promise<TestCase> {
     try {
-      const endpoint = testCase.id 
-        ? API_ENDPOINTS.TEST_CASE_BY_ID(testCase.id)
+      const endpoint = testCase.id
+        ? API_ENDPOINTS.TEST_CASE_BY_ID(testCase.id.toString())
         : API_ENDPOINTS.TEST_CASES;
-      
-      const method = testCase.id ? 'put' : 'post';
-      
+
+      const method = testCase.id ? "put" : "post";
+
       const response = await apiClient[method]<TestCase>(endpoint, testCase);
 
       if (!response.success) {
-        throw new Error(response.error || 'Failed to save test case');
+        throw new Error(response.error || "Failed to save test case");
       }
 
       return response.data!;
     } catch (error) {
-      console.error('Error saving test case:', error);
+      console.error("Error saving test case:", error);
       throw error;
     }
   }
@@ -110,13 +122,15 @@ export class TestCaseService {
    */
   static async deleteTestCase(id: string): Promise<void> {
     try {
-      const response = await apiClient.delete(API_ENDPOINTS.TEST_CASE_BY_ID(id));
+      const response = await apiClient.delete(
+        API_ENDPOINTS.TEST_CASE_BY_ID(id)
+      );
 
       if (!response.success) {
-        throw new Error(response.error || 'Failed to delete test case');
+        throw new Error(response.error || "Failed to delete test case");
       }
     } catch (error) {
-      console.error('Error deleting test case:', error);
+      console.error("Error deleting test case:", error);
       throw error;
     }
   }
@@ -132,12 +146,12 @@ export class TestCaseService {
       );
 
       if (!response.success) {
-        throw new Error(response.error || 'Failed to find similar test cases');
+        throw new Error(response.error || "Failed to find similar test cases");
       }
 
       return response.data || [];
     } catch (error) {
-      console.error('Error finding similar test cases:', error);
+      console.error("Error finding similar test cases:", error);
       throw error;
     }
   }
@@ -148,27 +162,29 @@ export class TestCaseService {
   static validateTestCase(testCase: Partial<TestCase>): string[] {
     const errors: string[] = [];
 
-    if (!testCase.name?.trim()) {
-      errors.push('Test case name is required');
+    if (!testCase.title?.trim()) {
+      errors.push("Test case title is required");
     }
 
     if (!testCase.description?.trim()) {
-      errors.push('Test case description is required');
+      errors.push("Test case description is required");
     }
 
-    if (!testCase.steps || testCase.steps.length === 0) {
-      errors.push('At least one test step is required');
-      } else {
-        testCase.steps.forEach((step: any, index: number) => {
-          if (!step.action?.trim()) {
-            errors.push(`Step ${index + 1}: Action is required`);
-          }
-          if (!step.expectedResult?.trim()) {
-            errors.push(`Step ${index + 1}: Expected result is required`);
-          }
-        });
-      }    if (!testCase.priority) {
-      errors.push('Priority is required');
+    if (!testCase.test_steps || testCase.test_steps.length === 0) {
+      errors.push("At least one test step is required");
+    } else {
+      testCase.test_steps.forEach((step: any, index: number) => {
+        if (!step.action?.trim()) {
+          errors.push(`Step ${index + 1}: Action is required`);
+        }
+        if (!step.expected_result?.trim()) {
+          errors.push(`Step ${index + 1}: Expected result is required`);
+        }
+      });
+    }
+
+    if (!testCase.priority) {
+      errors.push("Priority is required");
     }
 
     return errors;
@@ -181,8 +197,8 @@ export class TestCaseService {
     try {
       return JSON.stringify(testCases, null, 2);
     } catch (error) {
-      console.error('Error exporting test cases to JSON:', error);
-      throw new Error('Failed to export test cases');
+      console.error("Error exporting test cases to JSON:", error);
+      throw new Error("Failed to export test cases");
     }
   }
 
@@ -192,22 +208,22 @@ export class TestCaseService {
   static importFromJson(jsonString: string): TestCase[] {
     try {
       const testCases = JSON.parse(jsonString);
-      
+
       if (!Array.isArray(testCases)) {
-        throw new Error('Invalid format: expected array of test cases');
+        throw new Error("Invalid format: expected array of test cases");
       }
 
       // Validate each test case
       testCases.forEach((testCase, index) => {
         const errors = this.validateTestCase(testCase);
         if (errors.length > 0) {
-          throw new Error(`Test case ${index + 1}: ${errors.join(', ')}`);
+          throw new Error(`Test case ${index + 1}: ${errors.join(", ")}`);
         }
       });
 
       return testCases;
     } catch (error) {
-      console.error('Error importing test cases from JSON:', error);
+      console.error("Error importing test cases from JSON:", error);
       throw error;
     }
   }
