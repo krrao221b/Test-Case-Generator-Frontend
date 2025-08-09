@@ -1,0 +1,12 @@
+{
+  "/api/*": "/$1",
+  "/api/generate": "/generateRequests",
+  "/api/testcases": "/testCases",
+  "/api/testcases/:id": "/testCases/:id",
+  "/api/jira/ticket/:id": "/jiraTickets/:id",
+  "/api/jira/tickets": "/jiraTickets",
+  "/api/jira/tickets/:id": "/jiraTickets/:id",
+  "/api/zephyr/projects": "/projects",
+  "/api/zephyr/push": "/zephyrPush",
+  "/api/health": "/health"
+}

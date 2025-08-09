@@ -25,7 +25,18 @@ export class TestCaseService {
         throw new Error(response.error || 'Failed to generate test cases');
       }
 
-      return response.data!;
+      // Check if response.data contains the actual GenerateTestCaseResponse
+      if (response.data && typeof response.data === 'object' && 'testCases' in response.data) {
+        return response.data as GenerateTestCaseResponse;
+      }
+
+      // If response.data is wrapped in another success structure, unwrap it
+      const dataAsAny = response.data as any;
+      if (dataAsAny && dataAsAny.success && dataAsAny.data) {
+        return dataAsAny.data as GenerateTestCaseResponse;
+      }
+
+      throw new Error('Invalid response format from server');
     } catch (error) {
       console.error('Error generating test cases:', error);
       throw error;

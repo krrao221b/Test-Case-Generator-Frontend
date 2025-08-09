@@ -1,0 +1,285 @@
+{
+  "testCases": [
+    {
+      "id": "tc-001",
+      "name": "User Login Authentication Test",
+      "description": "Verify that users can successfully log in with valid credentials and receive appropriate error messages for invalid attempts",
+      "priority": "High",
+      "preconditions": "User account exists in the system with valid credentials",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "action": "Navigate to the login page",
+          "testData": "URL: https://app.example.com/login",
+          "expectedResult": "Login page displays with email and password input fields, and a 'Sign In' button"
+        },
+        {
+          "stepNumber": 2,
+          "action": "Enter valid email address",
+          "testData": "Email: testuser@example.com",
+          "expectedResult": "Email field accepts the input without validation errors"
+        },
+        {
+          "stepNumber": 3,
+          "action": "Enter valid password",
+          "testData": "Password: SecurePass123!",
+          "expectedResult": "Password field masks the input and accepts the password"
+        },
+        {
+          "stepNumber": 4,
+          "action": "Click the 'Sign In' button",
+          "testData": "",
+          "expectedResult": "User is authenticated and redirected to the dashboard page with welcome message"
+        }
+      ],
+      "createdAt": "2025-08-08T10:30:00Z",
+      "updatedAt": "2025-08-08T10:30:00Z",
+      "jiraTicketId": "PROJ-123",
+      "labels": ["authentication", "login", "security", "high-priority"]
+    },
+    {
+      "id": "tc-002",
+      "name": "Product Search Functionality Test",
+      "description": "Test the product search feature with various search terms and filters to ensure accurate results",
+      "priority": "Medium",
+      "preconditions": "Product catalog is populated with test data",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "action": "Access the product search page",
+          "testData": "URL: /products/search",
+          "expectedResult": "Search page loads with search input field and filter options visible"
+        },
+        {
+          "stepNumber": 2,
+          "action": "Enter product name in search field",
+          "testData": "Search term: 'iPhone 15 Pro'",
+          "expectedResult": "Auto-suggestions appear showing relevant product matches"
+        },
+        {
+          "stepNumber": 3,
+          "action": "Apply price range filter",
+          "testData": "Price range: $800 - $1200",
+          "expectedResult": "Search results are filtered to show only products within the specified price range"
+        },
+        {
+          "stepNumber": 4,
+          "action": "Verify search results accuracy",
+          "testData": "",
+          "expectedResult": "All displayed products match the search criteria and price filter"
+        }
+      ],
+      "createdAt": "2025-08-08T11:15:00Z",
+      "updatedAt": "2025-08-08T11:15:00Z",
+      "jiraTicketId": "PROJ-124",
+      "labels": ["search", "products", "filtering", "medium-priority"]
+    },
+    {
+      "id": "tc-003",
+      "name": "Shopping Cart Management Test",
+      "description": "Verify that users can add, update, and remove items from their shopping cart successfully",
+      "priority": "Critical",
+      "preconditions": "User is logged in and products are available for purchase",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "action": "Add product to shopping cart",
+          "testData": "Product: iPhone 15 Pro, Quantity: 2, Price: $999 each",
+          "expectedResult": "Product is added to cart, cart count shows 2 items, total shows $1,998"
+        },
+        {
+          "stepNumber": 2,
+          "action": "Update product quantity in cart",
+          "testData": "Change quantity from 2 to 3",
+          "expectedResult": "Cart quantity updates to 3, total price updates to $2,997"
+        },
+        {
+          "stepNumber": 3,
+          "action": "Remove product from cart",
+          "testData": "Click 'Remove' button for iPhone 15 Pro",
+          "expectedResult": "Product is completely removed from cart, cart becomes empty, total shows $0"
+        },
+        {
+          "stepNumber": 4,
+          "action": "Verify cart persistence",
+          "testData": "Refresh the page",
+          "expectedResult": "Cart remains empty after page refresh"
+        }
+      ],
+      "createdAt": "2025-08-08T09:45:00Z",
+      "updatedAt": "2025-08-08T09:45:00Z",
+      "jiraTicketId": "PROJ-125",
+      "labels": ["cart", "ecommerce", "critical", "user-flow"]
+    },
+    {
+      "id": "tc-004",
+      "name": "Password Reset Functionality Test",
+      "description": "Test the password reset flow to ensure users can successfully reset their passwords",
+      "priority": "Medium",
+      "preconditions": "User account exists with registered email address",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "action": "Navigate to forgot password page",
+          "testData": "Click 'Forgot Password' link on login page",
+          "expectedResult": "Password reset page displays with email input field"
+        },
+        {
+          "stepNumber": 2,
+          "action": "Enter registered email address",
+          "testData": "Email: user@example.com",
+          "expectedResult": "Email field accepts valid email format"
+        },
+        {
+          "stepNumber": 3,
+          "action": "Submit password reset request",
+          "testData": "Click 'Send Reset Email' button",
+          "expectedResult": "Success message appears confirming email has been sent"
+        }
+      ],
+      "createdAt": "2025-08-08T12:00:00Z",
+      "updatedAt": "2025-08-08T12:00:00Z",
+      "jiraTicketId": "PROJ-126",
+      "labels": ["password", "reset", "email", "security"]
+    },
+    {
+      "id": "tc-005",
+      "name": "File Upload Validation Test",
+      "description": "Verify file upload functionality with various file types and size restrictions",
+      "priority": "Low",
+      "preconditions": "User has access to file upload feature",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "action": "Access file upload interface",
+          "testData": "Navigate to profile settings > Upload Avatar",
+          "expectedResult": "File upload area is visible with drag-and-drop zone"
+        },
+        {
+          "stepNumber": 2,
+          "action": "Upload valid image file",
+          "testData": "File: profile.jpg (2MB, JPEG format)",
+          "expectedResult": "File uploads successfully, preview image appears"
+        },
+        {
+          "stepNumber": 3,
+          "action": "Attempt to upload invalid file type",
+          "testData": "File: document.pdf (3MB, PDF format)",
+          "expectedResult": "Error message appears: 'Only image files (JPG, PNG) are allowed'"
+        }
+      ],
+      "createdAt": "2025-08-08T13:30:00Z",
+      "updatedAt": "2025-08-08T13:30:00Z",
+      "jiraTicketId": "PROJ-127",
+      "labels": ["upload", "validation", "files", "low-priority"]
+    }
+  ],
+  "jiraTickets": [
+    {
+      "id": "PROJ-123",
+      "key": "PROJ-123",
+      "summary": "Implement secure user authentication system",
+      "description": "As a user, I want to be able to log into the system securely so that I can access my personal dashboard and protected features. The system should validate credentials and provide appropriate feedback for both successful and failed login attempts.",
+      "acceptanceCriteria": [
+        "User can enter email and password on login form",
+        "System validates credentials against user database",
+        "User is redirected to dashboard on successful authentication",
+        "Clear error message displayed for invalid credentials",
+        "Account lockout implemented after 5 consecutive failed attempts",
+        "Password requirements enforced (minimum 8 characters, special characters)",
+        "Remember me functionality works correctly"
+      ],
+      "status": "In Progress",
+      "assignee": "john.doe@example.com",
+      "reporter": "jane.smith@example.com",
+      "created": "2025-08-05T14:30:00Z",
+      "updated": "2025-08-08T10:30:00Z"
+    },
+    {
+      "id": "PROJ-124", 
+      "key": "PROJ-124",
+      "summary": "Enhanced product search and filtering capabilities",
+      "description": "Users need to be able to search for products efficiently and apply various filters to narrow down results. The search should be fast, accurate, and provide relevant suggestions.",
+      "acceptanceCriteria": [
+        "Search box accepts text input with real-time suggestions",
+        "Auto-complete suggestions appear as user types",
+        "Price range filter with slider controls",
+        "Category filter with checkbox options",
+        "Brand filter with multi-select capability",
+        "Search results update in real-time as filters are applied",
+        "Results can be sorted by price, popularity, or date added"
+      ],
+      "status": "To Do",
+      "assignee": "mike.wilson@example.com", 
+      "reporter": "sarah.johnson@example.com",
+      "created": "2025-08-06T09:15:00Z",
+      "updated": "2025-08-08T11:15:00Z"
+    },
+    {
+      "id": "PROJ-125",
+      "key": "PROJ-125", 
+      "summary": "Shopping cart management and persistence",
+      "description": "Implement comprehensive shopping cart functionality that allows users to manage their selected items efficiently.",
+      "acceptanceCriteria": [
+        "Users can add products to cart from product pages",
+        "Cart displays all added items with quantities and prices",
+        "Users can update quantities directly in the cart",
+        "Users can remove individual items from cart",
+        "Cart total calculates correctly including taxes and shipping",
+        "Cart contents persist across browser sessions",
+        "Cart is accessible from any page via header icon"
+      ],
+      "status": "In Progress",
+      "assignee": "lisa.brown@example.com",
+      "reporter": "david.lee@example.com", 
+      "created": "2025-08-07T16:20:00Z",
+      "updated": "2025-08-08T09:45:00Z"
+    }
+  ],
+  "generateRequests": [
+    {
+      "success": true,
+      "data": {
+        "testCases": [
+          {
+            "id": "tc-generated-001",
+            "name": "Generated Test Case from Manual Input",
+            "description": "This is a test case generated from manual acceptance criteria input",
+            "priority": "Medium",
+            "steps": [
+              {
+                "stepNumber": 1,
+                "action": "Perform the first test action",
+                "testData": "Sample test data",
+                "expectedResult": "Expected outcome should be visible"
+              },
+              {
+                "stepNumber": 2,
+                "action": "Verify the system response",
+                "testData": "Additional test parameters",
+                "expectedResult": "System responds correctly to input"
+              }
+            ],
+            "createdAt": "2025-08-08T14:00:00Z",
+            "labels": ["generated", "manual", "ai-created"]
+          }
+        ],
+        "similarTestCases": [
+          {
+            "id": "tc-002",
+            "name": "Product Search Functionality Test",
+            "description": "Test the product search feature with various search terms and filters",
+            "priority": "Medium"
+          }
+        ]
+      },
+      "message": "Test cases generated successfully"
+    }
+  ],
+  "health": {
+    "status": "healthy",
+    "service": "AI Test Case Generator Mock API",
+    "timestamp": "2025-08-08T14:00:00Z",
+    "version": "1.0.0"
+  }
+}

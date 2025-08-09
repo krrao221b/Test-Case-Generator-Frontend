@@ -114,8 +114,17 @@ class ApiClient {
    */
   async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
-      const response = await this.client.get<ApiResponse<T>>(url, config);
-      return response.data;
+      const response = await this.client.get<T>(url, config);
+      // Check if response is already in ApiResponse format or raw data
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        return response.data as ApiResponse<T>;
+      }
+      // Wrap raw data in ApiResponse format
+      return {
+        success: true,
+        data: response.data,
+        message: 'Request successful'
+      };
     } catch (error) {
       throw this.createApiError(error);
     }
@@ -126,8 +135,17 @@ class ApiClient {
    */
   async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
-      const response = await this.client.post<ApiResponse<T>>(url, data, config);
-      return response.data;
+      const response = await this.client.post<T>(url, data, config);
+      // Check if response is already in ApiResponse format or raw data
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        return response.data as ApiResponse<T>;
+      }
+      // Wrap raw data in ApiResponse format
+      return {
+        success: true,
+        data: response.data,
+        message: 'Request successful'
+      };
     } catch (error) {
       throw this.createApiError(error);
     }
@@ -138,8 +156,17 @@ class ApiClient {
    */
   async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
-      const response = await this.client.put<ApiResponse<T>>(url, data, config);
-      return response.data;
+      const response = await this.client.put<T>(url, data, config);
+      // Check if response is already in ApiResponse format or raw data
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        return response.data as ApiResponse<T>;
+      }
+      // Wrap raw data in ApiResponse format
+      return {
+        success: true,
+        data: response.data,
+        message: 'Request successful'
+      };
     } catch (error) {
       throw this.createApiError(error);
     }
@@ -150,8 +177,17 @@ class ApiClient {
    */
   async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
-      const response = await this.client.delete<ApiResponse<T>>(url, config);
-      return response.data;
+      const response = await this.client.delete<T>(url, config);
+      // Check if response is already in ApiResponse format or raw data
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        return response.data as ApiResponse<T>;
+      }
+      // Wrap raw data in ApiResponse format
+      return {
+        success: true,
+        data: response.data,
+        message: 'Request successful'
+      };
     } catch (error) {
       throw this.createApiError(error);
     }
@@ -180,7 +216,7 @@ class ApiClient {
     formData.append('file', file);
 
     try {
-      const response = await this.client.post<ApiResponse<T>>(url, formData, {
+      const response = await this.client.post<T>(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -191,7 +227,16 @@ class ApiClient {
           }
         },
       });
-      return response.data;
+      // Check if response is already in ApiResponse format or raw data
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        return response.data as ApiResponse<T>;
+      }
+      // Wrap raw data in ApiResponse format
+      return {
+        success: true,
+        data: response.data,
+        message: 'Upload successful'
+      };
     } catch (error) {
       throw this.createApiError(error);
     }

@@ -90,17 +90,14 @@ const TestCaseGeneratorPage: React.FC = () => {
     try {
       const response = await TestCaseService.generateTestCases(request);
       
-      if (response.success) {
-        setGeneratedTestCases(response.testCases);
-        setSimilarTestCases(response.similarTestCases || []);
-        
-        enqueueSnackbar(
-          `Successfully generated ${response.testCases.length} test cases`,
-          { variant: 'success' }
-        );
-      } else {
-        throw new Error(response.error || 'Failed to generate test cases');
-      }
+      // The response is already a GenerateTestCaseResponse, not wrapped in ApiResponse
+      setGeneratedTestCases(response.testCases);
+      setSimilarTestCases(response.similarTestCases || []);
+      
+      enqueueSnackbar(
+        `Successfully generated ${response.testCases.length} test cases`,
+        { variant: 'success' }
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       enqueueSnackbar(`Error: ${message}`, { variant: 'error' });
