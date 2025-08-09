@@ -11,6 +11,12 @@ import {
   Grid,
   Chip,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button as MuiButton,
+  Typography as MuiTypography,
 } from "@mui/material";
 import { useSearchParams } from "react-router-dom";
 import { useSnackbar } from "notistack";
@@ -63,6 +69,13 @@ const TestCaseGeneratorPage: React.FC = () => {
   const [generating, setGenerating] = useState<boolean>(false);
   const [generatedTestCases, setGeneratedTestCases] = useState<TestCase[]>([]);
   const [similarTestCases, setSimilarTestCases] = useState<TestCase[]>([]);
+  // Duplicate dialog state
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [duplicateTestCase, setDuplicateTestCase] = useState<TestCase | null>(
+    null
+  );
+  const [pendingRequest, setPendingRequest] =
+    useState<GenerateTestCaseRequest | null>(null);
 
   // Hooks
   const {
@@ -91,6 +104,14 @@ const TestCaseGeneratorPage: React.FC = () => {
 
     try {
       const response = await TestCaseService.generateTestCases(request);
+
+      // Duplicate detection
+      if (response.generation_metadata?.duplicate_detection) {
+        setDuplicateTestCase(response.test_case);
+        setDuplicateDialogOpen(true);
+        setGenerating(false);
+        return;
+      }
 
       // The response contains a single test_case and similar_cases
       setGeneratedTestCases([response.test_case]);
@@ -147,11 +168,69 @@ const TestCaseGeneratorPage: React.FC = () => {
       tags: [],
     };
 
+    setPendingRequest(request);
     await handleGenerate(request);
   };
 
   return (
     <Box>
+      {/* Duplicate Detection Dialog */}
+      <Dialog
+        open={duplicateDialogOpen}
+        onClose={() => setDuplicateDialogOpen(false)}
+      >
+        <DialogTitle>Duplicate Test Case Detected</DialogTitle>
+        <DialogContent>
+          <MuiTypography>
+            A test case with the same feature description and acceptance
+            criteria already exists.
+          </MuiTypography>
+          <MuiTypography sx={{ mt: 2, fontWeight: 600 }}>
+            Title: {duplicateTestCase?.title}
+          </MuiTypography>
+          <MuiTypography>
+            Description: {duplicateTestCase?.description}
+          </MuiTypography>
+        </DialogContent>
+        <DialogActions>
+          <MuiButton
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              if (duplicateTestCase) {
+                setGeneratedTestCases([duplicateTestCase]);
+                enqueueSnackbar("Using existing test case.", {
+                  variant: "info",
+                });
+              }
+              setDuplicateDialogOpen(false);
+            }}
+          >
+            Use Existing
+          </MuiButton>
+          <MuiButton
+            variant="outlined"
+            color="secondary"
+            onClick={async () => {
+              // Force new generation by adding a random tag or context
+              if (pendingRequest) {
+                const newRequest = {
+                  ...pendingRequest,
+                  additional_context:
+                    (pendingRequest.additional_context || "") +
+                    " [force new generation " +
+                    Date.now() +
+                    "]",
+                };
+                setDuplicateDialogOpen(false);
+                await handleGenerate(newRequest);
+              }
+            }}
+          >
+            Generate New
+          </MuiButton>
+        </DialogActions>
+      </Dialog>
       <Typography variant="h1" gutterBottom>
         Generate Test Cases
       </Typography>
