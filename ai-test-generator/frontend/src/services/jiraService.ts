@@ -1,6 +1,6 @@
-import { apiClient } from './apiClient';
-import { API_ENDPOINTS } from '../constants';
-import type { JiraTicket, ApiResponse } from '../types';
+import { apiClient } from "./apiClient";
+import { API_ENDPOINTS } from "../constants";
+import type { JiraTicket } from "../types";
 
 /**
  * Service for Jira integration
@@ -16,12 +16,12 @@ export class JiraService {
       );
 
       if (!response.success) {
-        throw new Error(response.error || 'Failed to fetch Jira ticket');
+        throw new Error(response.error || "Failed to fetch Jira ticket");
       }
 
       return response.data!;
     } catch (error) {
-      console.error('Error fetching Jira ticket:', error);
+      console.error("Error fetching Jira ticket:", error);
       throw error;
     }
   }
@@ -29,19 +29,21 @@ export class JiraService {
   /**
    * Get available Jira projects
    */
-  static async getProjects(): Promise<Array<{ id: string; key: string; name: string }>> {
+  static async getProjects(): Promise<
+    Array<{ id: string; key: string; name: string }>
+  > {
     try {
-      const response = await apiClient.get<Array<{ id: string; key: string; name: string }>>(
-        API_ENDPOINTS.JIRA_PROJECTS
-      );
+      const response = await apiClient.get<
+        Array<{ id: string; key: string; name: string }>
+      >(API_ENDPOINTS.JIRA_PROJECTS);
 
       if (!response.success) {
-        throw new Error(response.error || 'Failed to fetch Jira projects');
+        throw new Error(response.error || "Failed to fetch Jira projects");
       }
 
       return response.data || [];
     } catch (error) {
-      console.error('Error fetching Jira projects:', error);
+      console.error("Error fetching Jira projects:", error);
       throw error;
     }
   }
@@ -53,9 +55,9 @@ export class JiraService {
     try {
       // Match common Jira URL patterns
       const patterns = [
-        /\/browse\/([A-Z]+-\d+)/,  // Standard browse URL
-        /\/([A-Z]+-\d+)$/,         // Direct ticket URL
-        /ticketId=([A-Z]+-\d+)/,   // Query parameter
+        /\/browse\/([A-Z]+-\d+)/, // Standard browse URL
+        /\/([A-Z]+-\d+)$/, // Direct ticket URL
+        /ticketId=([A-Z]+-\d+)/, // Query parameter
       ];
 
       for (const pattern of patterns) {
@@ -67,7 +69,7 @@ export class JiraService {
 
       return null;
     } catch (error) {
-      console.error('Error parsing Jira URL:', error);
+      console.error("Error parsing Jira URL:", error);
       return null;
     }
   }
@@ -86,10 +88,10 @@ export class JiraService {
   static extractAcceptanceCriteria(description: string): string[] {
     try {
       const criteria: string[] = [];
-      
+
       // Common patterns for acceptance criteria
       const patterns = [
-        /(?:acceptance criteria|ac):\s*(.*?)(?:\n\n|\n(?=[A-Z])|$)/gmi,
+        /(?:acceptance criteria|ac):\s*(.*?)(?:\n\n|\n(?=[A-Z])|$)/gim,
         /(?:given|when|then|and)\s+(.+?)(?:\n|$)/gim,
         /^\s*[-*]\s+(.+?)(?:\n|$)/gim,
         /^\s*\d+\.\s+(.+?)(?:\n|$)/gim,
@@ -108,7 +110,7 @@ export class JiraService {
       // Remove duplicates and return
       return [...new Set(criteria)];
     } catch (error) {
-      console.error('Error extracting acceptance criteria:', error);
+      console.error("Error extracting acceptance criteria:", error);
       return [];
     }
   }
@@ -123,13 +125,21 @@ export class JiraService {
   } {
     return {
       title: `${ticket.key}: ${ticket.summary}`,
-      summary: ticket.description.substring(0, 200) + (ticket.description.length > 200 ? '...' : ''),
+      summary:
+        ticket.description.substring(0, 200) +
+        (ticket.description.length > 200 ? "..." : ""),
       details: [
-        { label: 'Status', value: ticket.status },
-        { label: 'Assignee', value: ticket.assignee || 'Unassigned' },
-        { label: 'Reporter', value: ticket.reporter || 'Unknown' },
-        { label: 'Created', value: new Date(ticket.created).toLocaleDateString() },
-        { label: 'Updated', value: new Date(ticket.updated).toLocaleDateString() },
+        { label: "Status", value: ticket.status },
+        { label: "Assignee", value: ticket.assignee || "Unassigned" },
+        { label: "Reporter", value: ticket.reporter || "Unknown" },
+        {
+          label: "Created",
+          value: new Date(ticket.created).toLocaleDateString(),
+        },
+        {
+          label: "Updated",
+          value: new Date(ticket.updated).toLocaleDateString(),
+        },
       ],
     };
   }

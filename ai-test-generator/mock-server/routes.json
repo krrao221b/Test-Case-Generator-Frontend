@@ -1,12 +1,13 @@
 {
-  "/api/*": "/$1",
-  "/api/generate": "/generateRequests",
-  "/api/testcases": "/testCases",
-  "/api/testcases/:id": "/testCases/:id",
-  "/api/jira/ticket/:id": "/jiraTickets/:id",
-  "/api/jira/tickets": "/jiraTickets",
-  "/api/jira/tickets/:id": "/jiraTickets/:id",
-  "/api/zephyr/projects": "/projects",
-  "/api/zephyr/push": "/zephyrPush",
+  "/api/v1/test-cases": "/test-cases",
+  "/api/v1/test-cases/:id": "/test-cases/:id",
+  "/api/v1/test-cases/": "/test-cases",
+  "/api/v1/test-cases/generate": "/test-cases",
+  "/api/v1/test-cases/generate/from-acceptance-criteria": "/test-cases",
+  "/api/v1/test-cases/generate/from-jira": "/test-cases",
+  "/api/v1/test-cases/find-similar": "/similar-cases",
+  "/api/v1/test-cases/search": "/test-cases",
+  "/api/v1/test-cases/search-similar": "/similar-cases",
+  "/api/v1/integrations/jira/projects": "/jira-projects",
   "/api/health": "/health"
 }

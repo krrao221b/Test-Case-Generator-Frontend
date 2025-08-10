@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Box,
   Typography,
@@ -12,22 +12,22 @@ import {
   ListItem,
   ListItemText,
   Divider,
-} from '@mui/material';
-import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
-import type { TestCase } from '../types';
+} from "@mui/material";
+import { ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
+import type { TestCase } from "../types";
 
 interface TestCasePreviewProps {
   testCases: TestCase[];
-  variant?: 'full' | 'compact';
+  variant?: "full" | "compact";
 }
 
 const TestCasePreview: React.FC<TestCasePreviewProps> = ({
   testCases,
-  variant = 'full',
+  variant = "full",
 }) => {
   if (testCases.length === 0) {
     return (
-      <Box sx={{ textAlign: 'center', py: 4 }}>
+      <Box sx={{ textAlign: "center", py: 4 }}>
         <Typography variant="body2" color="text.secondary">
           No test cases to display
         </Typography>
@@ -35,23 +35,27 @@ const TestCasePreview: React.FC<TestCasePreviewProps> = ({
     );
   }
 
-  if (variant === 'compact') {
+  if (variant === "compact") {
     return (
       <Box>
         {testCases.map((testCase, index) => (
           <Card key={index} sx={{ mb: 1 }}>
             <CardContent sx={{ py: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-                  {testCase.name}
+                  {testCase.title}
                 </Typography>
-                <Chip 
-                  label={testCase.priority} 
-                  size="small" 
+                <Chip
+                  label={testCase.priority}
+                  size="small"
                   color={
-                    testCase.priority === 'Critical' ? 'error' :
-                    testCase.priority === 'High' ? 'warning' :
-                    testCase.priority === 'Medium' ? 'info' : 'default'
+                    testCase.priority === "critical"
+                      ? "error"
+                      : testCase.priority === "high"
+                      ? "warning"
+                      : testCase.priority === "medium"
+                      ? "info"
+                      : "default"
                   }
                 />
               </Box>
@@ -67,27 +71,38 @@ const TestCasePreview: React.FC<TestCasePreviewProps> = ({
       {testCases.map((testCase, index) => (
         <Accordion key={index} sx={{ mb: 1 }}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
+                width: "100%",
+              }}
+            >
               <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
-                {testCase.name}
+                {testCase.title}
               </Typography>
-              <Chip 
-                label={testCase.priority} 
+              <Chip
+                label={testCase.priority}
                 size="small"
                 color={
-                  testCase.priority === 'Critical' ? 'error' :
-                  testCase.priority === 'High' ? 'warning' :
-                  testCase.priority === 'Medium' ? 'info' : 'default'
+                  testCase.priority === "critical"
+                    ? "error"
+                    : testCase.priority === "high"
+                    ? "warning"
+                    : testCase.priority === "medium"
+                    ? "info"
+                    : "default"
                 }
               />
             </Box>
           </AccordionSummary>
-          
+
           <AccordionDetails>
             <Typography variant="body2" color="text.secondary" paragraph>
               {testCase.description}
             </Typography>
-            
+
             {testCase.preconditions && (
               <>
                 <Typography variant="subtitle2" gutterBottom>
@@ -98,32 +113,43 @@ const TestCasePreview: React.FC<TestCasePreviewProps> = ({
                 </Typography>
               </>
             )}
-            
+
             <Typography variant="subtitle2" gutterBottom>
               Test Steps:
             </Typography>
-            
+
             <List dense>
-              {testCase.steps.map((step: any, stepIndex: number) => (
+              {testCase.test_steps.map((step: any, stepIndex: number) => (
                 <React.Fragment key={stepIndex}>
-                  <ListItem sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <ListItem
+                    sx={{ flexDirection: "column", alignItems: "flex-start" }}
+                  >
                     <ListItemText
-                      primary={`Step ${step.stepNumber}: ${step.action}`}
+                      primary={`Step ${step.step_number}: ${step.action}`}
                       secondary={
-                        <Box>
-                          {step.testData && (
-                            <Typography variant="body2" component="div">
-                              <strong>Test Data:</strong> {step.testData}
+                        <Box component="span">
+                          {step.test_data && (
+                            <Typography
+                              variant="body2"
+                              component="span"
+                              display="block"
+                            >
+                              <strong>Test Data:</strong> {step.test_data}
                             </Typography>
                           )}
-                          <Typography variant="body2" component="div">
-                            <strong>Expected Result:</strong> {step.expectedResult}
+                          <Typography
+                            variant="body2"
+                            component="span"
+                            display="block"
+                          >
+                            <strong>Expected Result:</strong>{" "}
+                            {step.expected_result}
                           </Typography>
                         </Box>
                       }
                     />
                   </ListItem>
-                  {stepIndex < testCase.steps.length - 1 && <Divider />}
+                  {stepIndex < testCase.test_steps.length - 1 && <Divider />}
                 </React.Fragment>
               ))}
             </List>
