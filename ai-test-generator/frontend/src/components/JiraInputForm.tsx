@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   TextField,
@@ -9,8 +9,8 @@ import {
   CardContent,
   Chip,
   Grid,
-} from '@mui/material';
-import type { JiraTicket } from '../types';
+} from "@mui/material";
+import type { JiraTicket } from "../types";
 
 interface JiraInputFormProps {
   onSubmit: (ticketIdOrUrl: string) => Promise<void>;
@@ -25,7 +25,7 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
   error,
   ticket,
 }) => {
-  const [input, setInput] = useState<string>('');
+  const [input, setInput] = useState<string>("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,13 +39,15 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
       <Typography variant="h6" gutterBottom>
         Jira Ticket Input
       </Typography>
-      
+
       <TextField
         fullWidth
         label="Jira Ticket ID or URL"
         placeholder="e.g., PROJ-123 or https://company.atlassian.net/browse/PROJ-123"
         value={input}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+          setInput(e.target.value)
+        }
         error={!!error}
         disabled={loading}
         sx={{ mb: 2 }}
@@ -70,10 +72,29 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
               <Grid item>
                 <Chip label={`Status: ${ticket.status}`} size="small" />
               </Grid>
+              {ticket.priority && (
+                <Grid item>
+                  <Chip label={`Priority: ${ticket.priority}`} size="small" />
+                </Grid>
+              )}
               <Grid item>
-                <Chip label={`Assignee: ${ticket.assignee || 'Unassigned'}`} size="small" />
+                <Chip
+                  label={`Assignee: ${ticket.assignee || "Unassigned"}`}
+                  size="small"
+                />
               </Grid>
             </Grid>
+            {ticket.acceptance_criteria && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" fontWeight="bold" gutterBottom>
+                  Acceptance Criteria:
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {ticket.acceptance_criteria.substring(0, 300)}
+                  {ticket.acceptance_criteria.length > 300 ? "..." : ""}
+                </Typography>
+              </Box>
+            )}
           </CardContent>
         </Card>
       )}
@@ -84,7 +105,7 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
         fullWidth
         disabled={loading || !input.trim()}
       >
-        {loading ? 'Fetching Ticket...' : 'Fetch & Generate'}
+        {loading ? "Fetching Ticket..." : "Fetch & Generate"}
       </Button>
     </Box>
   );

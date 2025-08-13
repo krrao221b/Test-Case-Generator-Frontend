@@ -141,7 +141,7 @@ const TestCaseGeneratorPage: React.FC = () => {
       if (ticket) {
         const request: GenerateTestCaseRequest = {
           feature_description: ticket.summary,
-          acceptance_criteria: ticket.acceptanceCriteria.join("\n"),
+          acceptance_criteria: ticket.acceptance_criteria, // Now a string, no need for .join()
           additional_context: ticket.description,
           priority: "medium",
           tags: [ticket.key],
