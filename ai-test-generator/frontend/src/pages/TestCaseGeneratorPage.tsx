@@ -18,7 +18,7 @@ import {
   Button as MuiButton,
   Typography as MuiTypography,
 } from "@mui/material";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useSnackbar } from "notistack";
 
 // Components (will be created)
@@ -63,6 +63,7 @@ function TabPanel(props: TabPanelProps) {
 const TestCaseGeneratorPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { enqueueSnackbar } = useSnackbar();
+  const navigate = useNavigate();
 
   // State
   const [activeTab, setActiveTab] = useState<number>(0);
@@ -135,24 +136,41 @@ const TestCaseGeneratorPage: React.FC = () => {
 
   const handleJiraSubmit = async (ticketIdOrUrl: string) => {
     try {
+      // Only fetch the ticket, don't generate yet
       await fetchTicket(ticketIdOrUrl);
 
-      // After fetching ticket, generate test cases
-      if (ticket) {
-        const request: GenerateTestCaseRequest = {
-          feature_description: ticket.summary,
-          acceptance_criteria: ticket.acceptance_criteria, // Now a string, no need for .join()
-          additional_context: ticket.description,
-          priority: "medium",
-          tags: [ticket.key],
-        };
-
-        await handleGenerate(request);
-      }
+      enqueueSnackbar("Ticket fetched successfully!", {
+        variant: "success",
+      });
     } catch (error) {
-      // Error handling is done in the useJira hook
       console.error("Jira fetch error:", error);
+      // Error handling is done in the useJira hook
     }
+  };
+
+  // Add new function for generation after fetch
+  const handleJiraGenerate = async () => {
+    if (!ticket) return;
+
+    try {
+      const request: GenerateTestCaseRequest = {
+        feature_description: ticket.summary,
+        acceptance_criteria: ticket.acceptance_criteria,
+        additional_context: ticket.description,
+        priority: "medium",
+        tags: [ticket.key],
+      };
+
+      await handleGenerate(request);
+    } catch (error) {
+      console.error("Generation error:", error);
+    }
+  };
+
+  // Add function to clear ticket when input changes
+  const handleClearTicket = () => {
+    // This should clear the ticket in useJira hook
+    // You'll need to add clearTicket method to useJira
   };
 
   const handleManualSubmit = async (data: {
@@ -254,6 +272,7 @@ const TestCaseGeneratorPage: React.FC = () => {
             <TabPanel value={activeTab} index={0}>
               <JiraInputForm
                 onSubmit={handleJiraSubmit}
+                onGenerate={handleJiraGenerate}
                 loading={jiraLoading || generating}
                 error={jiraError}
                 ticket={ticket}
@@ -317,11 +336,15 @@ const TestCaseGeneratorPage: React.FC = () => {
                     <Button
                       variant="contained"
                       onClick={() => {
-                        // Navigate to review page with generated test cases
-                        // This would be implemented with proper state management
-                        enqueueSnackbar("Navigate to review page", {
-                          variant: "info",
-                        });
+                        if (generatedTestCases.length > 0) {
+                          // Save the generated test case first if it's new
+                          const testCaseToReview = generatedTestCases[0];
+
+                          // Navigate to review page with the test case ID
+                          navigate(
+                            `/review?highlight=${testCaseToReview.id}&focus=true`
+                          );
+                        }
                       }}
                     >
                       Review & Edit

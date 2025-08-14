@@ -55,19 +55,6 @@ const ManualInputForm: React.FC<ManualInputFormProps> = ({
           <TextField
             fullWidth
             multiline
-            rows={4}
-            label="Acceptance Criteria"
-            placeholder="Enter acceptance criteria..."
-            value={formData.acceptanceCriteria}
-            onChange={handleChange('acceptanceCriteria')}
-            disabled={loading}
-          />
-        </Grid>
-        
-        <Grid item xs={12}>
-          <TextField
-            fullWidth
-            multiline
             rows={3}
             label="Feature Requirements"
             placeholder="Enter feature requirements..."
@@ -89,7 +76,19 @@ const ManualInputForm: React.FC<ManualInputFormProps> = ({
             disabled={loading}
           />
         </Grid>
-        
+        <Grid item xs={12}>
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            label="Acceptance Criteria"
+            placeholder="Enter acceptance criteria..."
+            value={formData.acceptanceCriteria}
+            onChange={handleChange('acceptanceCriteria')}
+            disabled={loading}
+          />
+        </Grid>
+
         <Grid item xs={12}>
           <Button
             type="submit"

@@ -23,8 +23,11 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   CloudUpload as PushIcon,
+  Add as AddIcon,
+  Remove as RemoveIcon,
 } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
+import { useSearchParams, useLocation } from "react-router-dom";
 
 // Components
 import TestCasePreview from "../components/TestCasePreview";
@@ -51,6 +54,14 @@ const TestCaseReviewPage: React.FC = () => {
   // Form state for editing
   const [editForm, setEditForm] = useState<Partial<TestCase>>({});
 
+  // Search params and location
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+
+  // Highlighted test case state
+  const [highlightedTestCaseId, setHighlightedTestCaseId] = useState<string | null>(null);
+  const [shouldScrollToHighlighted, setShouldScrollToHighlighted] = useState(false);
+
   useEffect(() => {
     fetchTestCases();
   }, []);
@@ -71,12 +82,51 @@ const TestCaseReviewPage: React.FC = () => {
 
   const handleEdit = (testCase: TestCase) => {
     setSelectedTestCase(testCase);
-    setEditForm({ ...testCase });
+    
+    // Ensure test steps have proper structure
+    const normalizedTestSteps = testCase.test_steps?.map((step, index) => ({
+      step_number: index + 1,
+      action: step.action || "",
+      expected_result: step.expected_result || "",
+      test_data: step.test_data || ""
+    })) || [];
+
+    setEditForm({ 
+      ...testCase,
+      test_steps: normalizedTestSteps
+    });
     setEditDialogOpen(true);
   };
 
   const handleSaveEdit = async () => {
     if (!selectedTestCase || !editForm.id) return;
+
+    // Validate test steps
+    const errors: string[] = [];
+    
+    if (!editForm.title?.trim()) {
+      errors.push("Title is required");
+    }
+    
+    if (!editForm.test_steps || editForm.test_steps.length === 0) {
+      errors.push("At least one test step is required");
+    } else {
+      editForm.test_steps.forEach((step, index) => {
+        if (!step.action?.trim()) {
+          errors.push(`Step ${index + 1}: Action is required`);
+        }
+        if (!step.expected_result?.trim()) {
+          errors.push(`Step ${index + 1}: Expected result is required`);
+        }
+      });
+    }
+
+    if (errors.length > 0) {
+      enqueueSnackbar(`Validation errors: ${errors.join(", ")}`, { 
+        variant: "error" 
+      });
+      return;
+    }
 
     try {
       const updatedTestCase = await TestCaseService.saveTestCase(editForm);
@@ -141,6 +191,98 @@ const TestCaseReviewPage: React.FC = () => {
     }
   };
 
+  // Highlight and scroll effect
+  useEffect(() => {
+    // Check for highlight parameter
+    const highlightId = searchParams.get('highlight');
+    const shouldFocus = searchParams.get('focus') === 'true';
+    const source = searchParams.get('source');
+    
+    if (highlightId) {
+      setHighlightedTestCaseId(highlightId);
+      setShouldScrollToHighlighted(shouldFocus);
+    }
+    
+    // If coming from generator with session data
+    if (source === 'generator') {
+      const pendingTestCases = sessionStorage.getItem('pendingReviewTestCases');
+      if (pendingTestCases) {
+        try {
+          const testCases = JSON.parse(pendingTestCases);
+          // Merge with existing test cases or handle as needed
+          if (testCases.length > 0) {
+            setHighlightedTestCaseId(testCases[0].id);
+            setShouldScrollToHighlighted(true);
+          }
+          // Clear session storage
+          sessionStorage.removeItem('pendingReviewTestCases');
+        } catch (error) {
+          console.error('Failed to parse pending test cases:', error);
+        }
+      }
+    }
+  }, [searchParams, location]);
+
+  // Add scroll effect
+  useEffect(() => {
+    if (shouldScrollToHighlighted && highlightedTestCaseId) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`test-case-${highlightedTestCaseId}`);
+        if (element) {
+          element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+        }
+        setShouldScrollToHighlighted(false);
+      }, 500); // Small delay to ensure render
+
+      return () => clearTimeout(timer);
+    }
+  }, [shouldScrollToHighlighted, highlightedTestCaseId, testCases]);
+
+  // Add helper functions for test step management
+  const addTestStep = () => {
+    const newStep = {
+      step_number: (editForm.test_steps?.length || 0) + 1,
+      action: "",
+      expected_result: "",
+      test_data: ""
+    };
+    
+    setEditForm({
+      ...editForm,
+      test_steps: [...(editForm.test_steps || []), newStep]
+    });
+  };
+
+  const removeTestStep = (index: number) => {
+    const updatedSteps = editForm.test_steps?.filter((_, i) => i !== index) || [];
+    // Renumber the remaining steps
+    const renumberedSteps = updatedSteps.map((step, i) => ({
+      ...step,
+      step_number: i + 1
+    }));
+    
+    setEditForm({
+      ...editForm,
+      test_steps: renumberedSteps
+    });
+  };
+
+  const updateTestStep = (index: number, field: keyof TestStep, value: string) => {
+    const updatedSteps = [...(editForm.test_steps || [])];
+    updatedSteps[index] = {
+      ...updatedSteps[index],
+      [field]: value
+    };
+    
+    setEditForm({
+      ...editForm,
+      test_steps: updatedSteps
+    });
+  };
+
   if (loading) {
     return (
       <Box
@@ -179,8 +321,32 @@ const TestCaseReviewPage: React.FC = () => {
         <Grid container spacing={3}>
           {testCases.map((testCase) => (
             <Grid item xs={12} key={testCase.id}>
-              <Card>
+              <Card
+                id={`test-case-${testCase.id}`} // Add ID for scrolling
+                sx={{
+                  // Add highlighting styles
+                  ...(highlightedTestCaseId === testCase.id?.toString() && {
+                    border: '2px solid',
+                    borderColor: 'primary.main',
+                    boxShadow: (theme) => `0 0 20px ${theme.palette.primary.main}40`,
+                    backgroundColor: (theme) => `${theme.palette.primary.main}08`,
+                  }),
+                  transition: 'all 0.3s ease-in-out',
+                }}
+              >
                 <CardContent>
+                  {/* Add a highlighted badge if this is the highlighted test case */}
+                  {highlightedTestCaseId === testCase.id?.toString() && (
+                    <Box sx={{ mb: 2 }}>
+                      <Chip 
+                        label="Recently Generated" 
+                        color="primary" 
+                        size="small"
+                        icon={<EditIcon />}
+                      />
+                    </Box>
+                  )}
+                  
                   <Box
                     sx={{
                       display: "flex",
@@ -257,16 +423,23 @@ const TestCaseReviewPage: React.FC = () => {
         </Grid>
       )}
 
-      {/* Edit Dialog */}
+      {/* Enhanced Edit Dialog */}
       <Dialog
         open={editDialogOpen}
         onClose={() => setEditDialogOpen(false)}
-        maxWidth="md"
+        maxWidth="lg" // Changed from "md" to "lg" for more space
         fullWidth
       >
         <DialogTitle>Edit Test Case</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
+            {/* Basic Information */}
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>
+                Basic Information
+              </Typography>
+            </Grid>
+            
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -277,6 +450,7 @@ const TestCaseReviewPage: React.FC = () => {
                 }
               />
             </Grid>
+            
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -289,6 +463,33 @@ const TestCaseReviewPage: React.FC = () => {
                 }
               />
             </Grid>
+
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                multiline
+                rows={2}
+                label="Feature Description"
+                value={editForm.feature_description || ""}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, feature_description: e.target.value })
+                }
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Acceptance Criteria"
+                value={editForm.acceptance_criteria || ""}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, acceptance_criteria: e.target.value })
+                }
+              />
+            </Grid>
+
             <Grid item xs={6}>
               <FormControl fullWidth>
                 <InputLabel>Priority</InputLabel>
@@ -309,6 +510,7 @@ const TestCaseReviewPage: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
+
             <Grid item xs={6}>
               <FormControl fullWidth>
                 <InputLabel>Status</InputLabel>
@@ -325,11 +527,121 @@ const TestCaseReviewPage: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
+
+            {/* Test Steps Section */}
+            <Grid item xs={12} sx={{ mt: 3 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                <Typography variant="h6">Test Steps</Typography>
+                <Button
+                  startIcon={<AddIcon />}
+                  variant="outlined"
+                  size="small"
+                  onClick={addTestStep}
+                >
+                  Add Step
+                </Button>
+              </Box>
+            </Grid>
+
+            {/* Test Steps List */}
+            {editForm.test_steps?.map((step, index) => (
+              <Grid item xs={12} key={index}>
+                <Card variant="outlined" sx={{ p: 2 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                    <Typography variant="subtitle1" color="primary">
+                      Step {step.step_number}
+                    </Typography>
+                    <Button
+                      startIcon={<RemoveIcon />}
+                      size="small"
+                      color="error"
+                      onClick={() => removeTestStep(index)}
+                      disabled={editForm.test_steps?.length === 1}
+                    >
+                      Remove
+                    </Button>
+                  </Box>
+                  
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Action"
+                        placeholder="Describe what the user should do..."
+                        value={step.action || ""}
+                        onChange={(e) => updateTestStep(index, "action", e.target.value)}
+                        multiline
+                        rows={2}
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        label="Test Data (Optional)"
+                        placeholder="Any specific data needed for this step..."
+                        value={step.test_data || ""}
+                        onChange={(e) => updateTestStep(index, "test_data", e.target.value)}
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        fullWidth
+                        label="Expected Result"
+                        placeholder="What should happen after this action..."
+                        value={step.expected_result || ""}
+                        onChange={(e) => updateTestStep(index, "expected_result", e.target.value)}
+                        multiline
+                        rows={2}
+                      />
+                    </Grid>
+                  </Grid>
+                </Card>
+              </Grid>
+            ))}
+
+            {/* Overall Expected Result */}
+            <Grid item xs={12} sx={{ mt: 2 }}>
+              <TextField
+                fullWidth
+                multiline
+                rows={2}
+                label="Overall Expected Result"
+                value={editForm.expected_result || ""}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, expected_result: e.target.value })
+                }
+              />
+            </Grid>
+
+            {/* Tags */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Tags (comma-separated)"
+                value={editForm.tags?.join(", ") || ""}
+                onChange={(e) =>
+                  setEditForm({ 
+                    ...editForm, 
+                    tags: e.target.value.split(",").map(tag => tag.trim()).filter(tag => tag) 
+                  })
+                }
+                placeholder="authentication, login, security"
+              />
+            </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleSaveEdit} variant="contained">
+        
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setEditDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSaveEdit} 
+            variant="contained"
+            disabled={!editForm.title?.trim() || !editForm.test_steps?.length}
+          >
             Save Changes
           </Button>
         </DialogActions>
