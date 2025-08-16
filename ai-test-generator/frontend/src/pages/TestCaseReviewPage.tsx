@@ -319,7 +319,8 @@ const TestCaseReviewPage: React.FC = () => {
 
   return (
     <Box>
-      <Typography variant="h1" gutterBottom>
+      <Typography variant="h1" gutterBottom
+      sx={{ mt: 6.5 }}>
         Review & Edit Test Cases
       </Typography>
 
@@ -404,7 +405,7 @@ const TestCaseReviewPage: React.FC = () => {
                       </Box>
                     </Box>
 
-                    <Box sx={{ display: "flex", gap: 1 }}>
+                    <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
                       <Button
                         size="small"
                         startIcon={<EditIcon />}

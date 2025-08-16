@@ -21,6 +21,7 @@ import TestCaseLibraryPage from './pages/TestCaseLibraryPage';
 // Components
 import Navigation from './components/Navigation';
 import ErrorBoundary from './components/ErrorBoundary';
+import ScrollToTop from './components/ScrollToTop';
 
 // Theme configuration
 const theme = createTheme({
@@ -91,9 +92,10 @@ const App: React.FC = () => {
       >
         <ErrorBoundary>
           <Router>
+            <ScrollToTop />
             <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
               {/* App Bar */}
-              <AppBar position="sticky" elevation={1}>
+              <AppBar position="fixed" elevation={0}>
                 <Toolbar>
                   <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
                     AI Test Case Generator

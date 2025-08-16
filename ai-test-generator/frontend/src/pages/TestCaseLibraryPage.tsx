@@ -144,6 +144,7 @@ const TestCaseLibraryPage: React.FC = () => {
           justifyContent: "space-between",
           alignItems: "center",
           mb: 3,
+          mt: 6.5,
         }}
       >
         <Typography variant="h1">Test Case Library</Typography>
