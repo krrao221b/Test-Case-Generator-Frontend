@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   TextField,
@@ -9,11 +9,16 @@ import {
   CardContent,
   Chip,
   Grid,
-} from '@mui/material';
-import type { JiraTicket } from '../types';
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+} from "@mui/material";
+import { ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
+import type { JiraTicket } from "../types";
 
 interface JiraInputFormProps {
   onSubmit: (ticketIdOrUrl: string) => Promise<void>;
+  onGenerate?: () => Promise<void>; // New prop for generate action
   loading: boolean;
   error: string | null;
   ticket: JiraTicket | null;
@@ -21,17 +26,42 @@ interface JiraInputFormProps {
 
 const JiraInputForm: React.FC<JiraInputFormProps> = ({
   onSubmit,
+  onGenerate,
   loading,
   error,
   ticket,
 }) => {
-  const [input, setInput] = useState<string>('');
+  const [input, setInput] = useState<string>("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim()) {
+
+    if (ticket && onGenerate) {
+      // If ticket is already fetched, generate test cases
+      await onGenerate();
+    } else if (input.trim()) {
+      // If no ticket yet, fetch the ticket
       await onSubmit(input.trim());
     }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+    // Clear the ticket when user changes input (forces re-fetch)
+    // This will be handled by parent component
+  };
+
+  const getButtonText = () => {
+    if (loading) {
+      return ticket ? "Generating..." : "Fetching Ticket...";
+    }
+    return ticket ? "Generate Test Cases" : "Fetch Ticket";
+  };
+
+  const isButtonDisabled = () => {
+    if (loading) return true;
+    if (ticket) return false; // Can always generate if ticket exists
+    return !input.trim(); // Need input to fetch
   };
 
   return (
@@ -39,13 +69,13 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
       <Typography variant="h6" gutterBottom>
         Jira Ticket Input
       </Typography>
-      
+
       <TextField
         fullWidth
         label="Jira Ticket ID or URL"
         placeholder="e.g., PROJ-123 or https://company.atlassian.net/browse/PROJ-123"
         value={input}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
+        onChange={handleInputChange}
         error={!!error}
         disabled={loading}
         sx={{ mb: 2 }}
@@ -63,17 +93,68 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
             <Typography variant="subtitle1" gutterBottom>
               {ticket.key}: {ticket.summary}
             </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              {ticket.description.substring(0, 200)}...
-            </Typography>
-            <Grid container spacing={1}>
+
+            <Grid container spacing={1} sx={{ mb: 2 }}>
               <Grid item>
                 <Chip label={`Status: ${ticket.status}`} size="small" />
               </Grid>
+              {ticket.priority && (
+                <Grid item>
+                  <Chip label={`Priority: ${ticket.priority}`} size="small" />
+                </Grid>
+              )}
               <Grid item>
-                <Chip label={`Assignee: ${ticket.assignee || 'Unassigned'}`} size="small" />
+                <Chip
+                  label={`Assignee: ${ticket.assignee || "Unassigned"}`}
+                  size="small"
+                />
               </Grid>
             </Grid>
+
+            {/* Full Description in Accordion */}
+            {ticket.description && (
+              <Accordion sx={{ mb: 2 }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="body2" fontWeight="bold">
+                    Description
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ whiteSpace: "pre-wrap" }}
+                  >
+                    {ticket.description}
+                  </Typography>
+                </AccordionDetails>
+              </Accordion>
+            )}
+
+            {/* Full Acceptance Criteria in Accordion */}
+            {ticket.acceptance_criteria && (
+              <Accordion>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="body2" fontWeight="bold">
+                    Acceptance Criteria
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ whiteSpace: "pre-wrap" }}
+                  >
+                    {ticket.acceptance_criteria}
+                  </Typography>
+                </AccordionDetails>
+              </Accordion>
+            )}
+
+            {/* Success message */}
+            <Alert severity="success" sx={{ mt: 2 }}>
+              Ticket fetched successfully! Click "Generate Test Cases" to proceed.
+            </Alert>
           </CardContent>
         </Card>
       )}
@@ -82,10 +163,26 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
         type="submit"
         variant="contained"
         fullWidth
-        disabled={loading || !input.trim()}
+        disabled={isButtonDisabled()}
+        color={ticket ? "success" : "primary"}
       >
-        {loading ? 'Fetching Ticket...' : 'Fetch & Generate'}
+        {getButtonText()}
       </Button>
+
+      {/* Reset button when ticket is loaded */}
+      {ticket && !loading && (
+        <Button
+          variant="outlined"
+          fullWidth
+          sx={{ mt: 1 }}
+          onClick={() => {
+            setInput("");
+            // This will trigger parent to clear ticket
+          }}
+        >
+          Fetch Different Ticket
+        </Button>
+      )}
     </Box>
   );
 };

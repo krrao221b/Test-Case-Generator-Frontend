@@ -11,7 +11,7 @@ export class JiraService {
    */
   static async getTicket(ticketIdOrKey: string): Promise<JiraTicket> {
     try {
-      const response = await apiClient.get<JiraTicket>(
+      const response = await apiClient.get<any>(
         `${API_ENDPOINTS.JIRA_TICKET}/${ticketIdOrKey}`
       );
 
@@ -19,7 +19,24 @@ export class JiraService {
         throw new Error(response.error || "Failed to fetch Jira ticket");
       }
 
-      return response.data!;
+      // Map backend response to frontend JiraTicket type
+      const backendData = response.data;
+      const jiraTicket: JiraTicket = {
+        id: backendData.key, // Use key as id since backend doesn't return separate id
+        key: backendData.key,
+        summary: backendData.summary,
+        description: backendData.description,
+        acceptance_criteria: backendData.acceptance_criteria || "",
+        status: backendData.status,
+        priority: backendData.priority,
+        assignee: backendData.assignee,
+        reporter: backendData.reporter,
+        created: backendData.created,
+        updated: backendData.updated,
+        attachments: backendData.attachments || [],
+      };
+
+      return jiraTicket;
     } catch (error) {
       console.error("Error fetching Jira ticket:", error);
       throw error;
@@ -130,15 +147,20 @@ export class JiraService {
         (ticket.description.length > 200 ? "..." : ""),
       details: [
         { label: "Status", value: ticket.status },
+        { label: "Priority", value: ticket.priority || "Unknown" },
         { label: "Assignee", value: ticket.assignee || "Unassigned" },
         { label: "Reporter", value: ticket.reporter || "Unknown" },
         {
           label: "Created",
-          value: new Date(ticket.created).toLocaleDateString(),
+          value: ticket.created
+            ? new Date(ticket.created).toLocaleDateString()
+            : "Unknown",
         },
         {
           label: "Updated",
-          value: new Date(ticket.updated).toLocaleDateString(),
+          value: ticket.updated
+            ? new Date(ticket.updated).toLocaleDateString()
+            : "Unknown",
         },
       ],
     };

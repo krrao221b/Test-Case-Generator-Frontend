@@ -5,12 +5,14 @@ export interface JiraTicket {
   key: string;
   summary: string;
   description: string;
-  acceptanceCriteria: string[];
+  acceptance_criteria: string; // Changed from array to string to match backend
   status: string;
+  priority?: string;
   assignee?: string;
   reporter?: string;
-  created: string;
-  updated: string;
+  created?: string;
+  updated?: string;
+  attachments?: Array<{ filename: string; url: string }>;
 }
 
 export interface TestStep {
