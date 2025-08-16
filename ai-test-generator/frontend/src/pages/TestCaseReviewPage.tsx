@@ -36,7 +36,7 @@ import TestCasePreview from "../components/TestCasePreview";
 import { TestCaseService, ZephyrService } from "../services";
 
 // Types
-import type { TestCase } from "../types";
+import type { TestCase, TestStep } from "../types";
 
 const TestCaseReviewPage: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
