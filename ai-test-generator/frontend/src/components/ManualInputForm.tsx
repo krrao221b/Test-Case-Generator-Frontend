@@ -56,7 +56,7 @@ const ManualInputForm: React.FC<ManualInputFormProps> = ({
             fullWidth
             multiline
             rows={3}
-            label="Feature Requirements"
+            label="User Story"
             placeholder="Enter feature requirements..."
             value={formData.featureRequirements}
             onChange={handleChange('featureRequirements')}
@@ -64,18 +64,6 @@ const ManualInputForm: React.FC<ManualInputFormProps> = ({
           />
         </Grid>
         
-        <Grid item xs={12}>
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            label="Description"
-            placeholder="Enter feature description..."
-            value={formData.description}
-            onChange={handleChange('description')}
-            disabled={loading}
-          />
-        </Grid>
         <Grid item xs={12}>
           <TextField
             fullWidth
@@ -88,6 +76,20 @@ const ManualInputForm: React.FC<ManualInputFormProps> = ({
             disabled={loading}
           />
         </Grid>
+
+        <Grid item xs={12}>
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            label="Additional Information"
+            placeholder="Enter feature description..."
+            value={formData.description}
+            onChange={handleChange('description')}
+            disabled={loading}
+          />
+        </Grid>
+        
 
         <Grid item xs={12}>
           <Button

@@ -249,7 +249,8 @@ const TestCaseGeneratorPage: React.FC = () => {
           </MuiButton>
         </DialogActions>
       </Dialog>
-      <Typography variant="h1" gutterBottom>
+      <Typography variant="h1" gutterBottom
+      sx={{ mt: 6.5 }}>
         Generate Test Cases
       </Typography>
 
