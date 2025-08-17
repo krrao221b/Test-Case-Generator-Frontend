@@ -61,20 +61,23 @@ export interface GenerateTestCaseResponse {
 }
 
 export interface ZephyrPushRequest {
-  testCases: TestCase[];
-  projectKey: string;
-  cycleId?: string;
+  jira_id: string;
+  testcase_name?: string;
+  objective?: string;
+  precondition?: string;
+  test_steps: Array<{
+    step: string;
+    test_data: string;
+    expected_result: string;
+  }>;
 }
 
 export interface ZephyrPushResponse {
-  success: boolean;
-  pushedTestCases: Array<{
-    localId: string;
-    zephyrId: string;
-    status: "success" | "failed";
-    error?: string;
-  }>;
-  message?: string;
+  message: string;
+  testcase_key: string;
+  testcase_id: number;
+  linked_to_issue: boolean;
+  steps_pushed: boolean;
 }
 
 export interface ApiResponse<T = any> {

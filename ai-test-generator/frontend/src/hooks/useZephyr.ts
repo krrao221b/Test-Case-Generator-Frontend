@@ -6,8 +6,8 @@ interface UseZephyrReturn {
   loading: boolean;
   error: string | null;
   pushResult: ZephyrPushResponse | null;
-  pushTestCases: (testCases: TestCase[], projectKey: string, cycleId?: string) => Promise<void>;
-  validateTestCases: (testCases: TestCase[]) => string[];
+  pushTestCase: (testCase: TestCase, jiraId: string) => Promise<void>;
+  validateTestCase: (testCase: TestCase, jiraId: string) => string[];
   clearPushResult: () => void;
 }
 
@@ -19,41 +19,36 @@ export const useZephyr = (): UseZephyrReturn => {
   const [error, setError] = useState<string | null>(null);
   const [pushResult, setPushResult] = useState<ZephyrPushResponse | null>(null);
 
-  const pushTestCases = useCallback(async (
-    testCases: TestCase[], 
-    projectKey: string, 
-    cycleId?: string
+  const pushTestCase = useCallback(async (
+    testCase: TestCase, 
+    jiraId: string
   ): Promise<void> => {
     setLoading(true);
     setError(null);
     setPushResult(null);
     
     try {
-      // Validate test cases before pushing
-      const validationErrors = ZephyrService.validateTestCasesForZephyr(testCases);
+      // Validate test case before pushing
+      const validationErrors = ZephyrService.validateTestCaseForZephyr(testCase, jiraId);
       if (validationErrors.length > 0) {
         throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
       }
 
-      const request: ZephyrPushRequest = {
-        testCases,
-        projectKey,
-        cycleId,
-      };
+      const request: ZephyrPushRequest = ZephyrService.formatTestCaseForZephyr(testCase, jiraId);
 
-      const result = await ZephyrService.pushTestCases(request);
+      const result = await ZephyrService.pushTestCase(request);
       setPushResult(result);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to push test cases to Zephyr';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to push test case to Zephyr';
       setError(errorMessage);
-      console.error('Error pushing test cases to Zephyr:', err);
+      console.error('Error pushing test case to Zephyr:', err);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const validateTestCases = useCallback((testCases: TestCase[]): string[] => {
-    return ZephyrService.validateTestCasesForZephyr(testCases);
+  const validateTestCase = useCallback((testCase: TestCase, jiraId: string): string[] => {
+    return ZephyrService.validateTestCaseForZephyr(testCase, jiraId);
   }, []);
 
   const clearPushResult = useCallback(() => {
@@ -65,8 +60,8 @@ export const useZephyr = (): UseZephyrReturn => {
     loading,
     error,
     pushResult,
-    pushTestCases,
-    validateTestCases,
+    pushTestCase,
+    validateTestCase,
     clearPushResult,
   };
 };

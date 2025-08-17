@@ -16,7 +16,7 @@ export const API_ENDPOINTS = {
   JIRA_PROJECTS: "/api/v1/integrations/jira/projects",
 
   // Zephyr integration
-  ZEPHYR_PUSH: "/api/v1/integrations/zephyr",
+  ZEPHYR_PUSH: "/api/v1/integrations/zephyr/push",
   ZEPHYR_PROJECTS: "/api/v1/integrations/zephyr/projects",
 
   // Test case management

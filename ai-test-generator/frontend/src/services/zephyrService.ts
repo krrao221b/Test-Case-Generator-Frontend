@@ -12,9 +12,9 @@ import type {
  */
 export class ZephyrService {
   /**
-   * Push test cases to Zephyr Scale
+   * Push a single test case to Zephyr Scale
    */
-  static async pushTestCases(
+  static async pushTestCase(
     request: ZephyrPushRequest
   ): Promise<ZephyrPushResponse> {
     try {
@@ -25,35 +25,13 @@ export class ZephyrService {
 
       if (!response.success) {
         throw new Error(
-          response.error || "Failed to push test cases to Zephyr"
+          response.error || "Failed to push test case to Zephyr"
         );
       }
 
       return response.data!;
     } catch (error) {
-      console.error("Error pushing test cases to Zephyr:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get available Zephyr projects
-   */
-  static async getProjects(): Promise<
-    Array<{ id: string; key: string; name: string }>
-  > {
-    try {
-      const response = await apiClient.get<
-        Array<{ id: string; key: string; name: string }>
-      >(API_ENDPOINTS.ZEPHYR_PROJECTS);
-
-      if (!response.success) {
-        throw new Error(response.error || "Failed to fetch Zephyr projects");
-      }
-
-      return response.data || [];
-    } catch (error) {
-      console.error("Error fetching Zephyr projects:", error);
+      console.error("Error pushing test case to Zephyr:", error);
       throw error;
     }
   }
@@ -61,107 +39,54 @@ export class ZephyrService {
   /**
    * Format test case for Zephyr Scale API
    */
-  static formatTestCaseForZephyr(testCase: TestCase): any {
+  static formatTestCaseForZephyr(testCase: TestCase, jiraId: string): ZephyrPushRequest {
     return {
-      name: testCase.title,
-      description: testCase.description,
+      jira_id: jiraId,
+      testcase_name: testCase.title,
+      objective: testCase.description,
       precondition: testCase.preconditions || "",
-      priority: testCase.priority,
-      estimatedTime: 0, // Default since TestCase doesn't have this field
-      labels: testCase.tags || [],
-      testSteps: testCase.test_steps.map((step: TestStep, index: number) => ({
-        index: index + 1,
-        description: step.action,
-        testData: step.test_data || "",
-        expectedResult: step.expected_result,
+      test_steps: testCase.test_steps.map((step: TestStep) => ({
+        step: step.action,
+        test_data: step.test_data || "",
+        expected_result: step.expected_result,
       })),
     };
   }
 
   /**
-   * Validate test cases before pushing to Zephyr
+   * Validate test case before pushing to Zephyr
    */
-  static validateTestCasesForZephyr(testCases: TestCase[]): string[] {
+  static validateTestCaseForZephyr(testCase: TestCase, jiraId: string): string[] {
     const errors: string[] = [];
 
-    if (!testCases || testCases.length === 0) {
-      errors.push("No test cases to push");
-      return errors;
+    if (!jiraId?.trim()) {
+      errors.push("JIRA ID is required");
     }
 
-    testCases.forEach((testCase, index) => {
-      const testCaseNumber = index + 1;
+    if (!testCase.title?.trim()) {
+      errors.push("Test case title is required");
+    }
 
-      if (!testCase.title?.trim()) {
-        errors.push(`Test case ${testCaseNumber}: Title is required`);
-      }
+    if (!testCase.description?.trim()) {
+      errors.push("Test case description is required");
+    }
 
-      if (!testCase.description?.trim()) {
-        errors.push(`Test case ${testCaseNumber}: Description is required`);
-      }
+    if (!testCase.test_steps || testCase.test_steps.length === 0) {
+      errors.push("At least one test step is required");
+    } else {
+      testCase.test_steps.forEach((step: TestStep, stepIndex: number) => {
+        const stepNumber = stepIndex + 1;
 
-      if (!testCase.test_steps || testCase.test_steps.length === 0) {
-        errors.push(
-          `Test case ${testCaseNumber}: At least one test step is required`
-        );
-      } else {
-        testCase.test_steps.forEach((step: TestStep, stepIndex: number) => {
-          const stepNumber = stepIndex + 1;
+        if (!step.action?.trim()) {
+          errors.push(`Step ${stepNumber}: Action is required`);
+        }
 
-          if (!step.action?.trim()) {
-            errors.push(
-              `Test case ${testCaseNumber}, Step ${stepNumber}: Action is required`
-            );
-          }
-
-          if (!step.expected_result?.trim()) {
-            errors.push(
-              `Test case ${testCaseNumber}, Step ${stepNumber}: Expected result is required`
-            );
-          }
-        });
-      }
-
-      if (!testCase.priority) {
-        errors.push(`Test case ${testCaseNumber}: Priority is required`);
-      }
-    });
+        if (!step.expected_result?.trim()) {
+          errors.push(`Step ${stepNumber}: Expected result is required`);
+        }
+      });
+    }
 
     return errors;
-  }
-
-  /**
-   * Estimate push time based on number of test cases
-   */
-  static estimatePushTime(testCaseCount: number): string {
-    const baseTime = 2; // seconds per test case
-    const totalSeconds = testCaseCount * baseTime;
-
-    if (totalSeconds < 60) {
-      return `${totalSeconds} seconds`;
-    } else {
-      const minutes = Math.ceil(totalSeconds / 60);
-      return `${minutes} minute${minutes > 1 ? "s" : ""}`;
-    }
-  }
-
-  /**
-   * Create push summary for user confirmation
-   */
-  static createPushSummary(
-    testCases: TestCase[],
-    projectKey: string
-  ): {
-    totalTestCases: number;
-    estimatedTime: string;
-    projectKey: string;
-    testCaseNames: string[];
-  } {
-    return {
-      totalTestCases: testCases.length,
-      estimatedTime: this.estimatePushTime(testCases.length),
-      projectKey,
-      testCaseNames: testCases.map((tc) => tc.title),
-    };
   }
 }

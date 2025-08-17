@@ -36,7 +36,7 @@ import TestCasePreview from "../components/TestCasePreview";
 import { TestCaseService, ZephyrService } from "../services";
 
 // Types
-import type { TestCase } from "../types";
+import type { TestCase, TestStep } from "../types";
 
 const TestCaseReviewPage: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
@@ -48,7 +48,6 @@ const TestCaseReviewPage: React.FC = () => {
   );
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
-  const [pushDialogOpen, setPushDialogOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Form state for editing
@@ -162,26 +161,43 @@ const TestCaseReviewPage: React.FC = () => {
     }
   };
 
-  const handlePushToZephyr = (testCase: TestCase) => {
-    setSelectedTestCase(testCase);
-    setPushDialogOpen(true);
-  };
-
-  const confirmPushToZephyr = async () => {
-    if (!selectedTestCase?.id) return;
-
+  const handlePushToZephyr = async (testCase: TestCase) => {
+    // Check if test case has a JIRA issue key
+    let jiraId = testCase.jira_issue_key;
+    
+    // If no JIRA issue key, try to extract from tags
+    if (!jiraId && testCase.tags && testCase.tags.length > 0) {
+      // Look for JIRA/SCRUM pattern in tags (e.g., "SCRUM-22", "PROJ-123")
+      for (const tag of testCase.tags) {
+        if (tag && tag.includes('-')) {
+          const parts = tag.split('-');
+          if (parts.length === 2 && parts[0].match(/^[A-Z]+$/) && parts[1].match(/^\d+$/)) {
+            jiraId = tag;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (!jiraId) {
+      enqueueSnackbar(
+        "No JIRA issue key found. Please ensure the test case is linked to a JIRA ticket.", 
+        { variant: "warning" }
+      );
+      return;
+    }
+    
     try {
-      // Note: This is a simplified implementation
-      // In reality, you'd need project selection and other Zephyr configuration
-      await ZephyrService.pushTestCases({
-        projectKey: "DEFAULT", // This should come from user selection
-        testCases: [selectedTestCase],
-      } as any);
-
-      setPushDialogOpen(false);
-      enqueueSnackbar("Test case pushed to Zephyr Scale successfully", {
-        variant: "success",
-      });
+      // Format the request according to backend API
+      const request = ZephyrService.formatTestCaseForZephyr(testCase, jiraId);
+      
+      // Push to Zephyr
+      const response = await ZephyrService.pushTestCase(request);
+      
+      enqueueSnackbar(
+        `Test case pushed to Zephyr successfully! Test case key: ${response.testcase_key} (linked to ${jiraId})`, 
+        { variant: "success" }
+      );
     } catch (error) {
       const message =
         error instanceof Error
@@ -667,24 +683,6 @@ const TestCaseReviewPage: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Push to Zephyr Dialog */}
-      <Dialog open={pushDialogOpen} onClose={() => setPushDialogOpen(false)}>
-        <DialogTitle>Push to Zephyr Scale</DialogTitle>
-        <DialogContent>
-          <Typography paragraph>
-            Push "{selectedTestCase?.title}" to Zephyr Scale?
-          </Typography>
-          <Alert severity="info" sx={{ mt: 2 }}>
-            This will create a new test case in your Zephyr Scale project.
-          </Alert>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPushDialogOpen(false)}>Cancel</Button>
-          <Button onClick={confirmPushToZephyr} variant="contained">
-            Push to Zephyr
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };
