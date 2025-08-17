@@ -18,6 +18,7 @@ import {
   Select,
   MenuItem,
   CircularProgress,
+  Pagination,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -38,6 +39,8 @@ import { TestCaseService, ZephyrService } from "../services";
 // Types
 import type { TestCase, TestStep } from "../types";
 
+const ITEMS_PER_PAGE = 5;
+
 const TestCaseReviewPage: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
 
@@ -49,6 +52,9 @@ const TestCaseReviewPage: React.FC = () => {
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Form state for editing
   const [editForm, setEditForm] = useState<Partial<TestCase>>({});
@@ -70,6 +76,8 @@ const TestCaseReviewPage: React.FC = () => {
       setLoading(true);
       const cases = await TestCaseService.getAllTestCases();
       setTestCases(cases);
+      // reset to page 1 after fresh load (optional)
+      setCurrentPage(1);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to load test cases";
@@ -81,7 +89,7 @@ const TestCaseReviewPage: React.FC = () => {
 
   const handleEdit = (testCase: TestCase) => {
     setSelectedTestCase(testCase);
-    
+
     // Ensure test steps have proper structure
     const normalizedTestSteps = testCase.test_steps?.map((step, index) => ({
       step_number: index + 1,
@@ -90,7 +98,7 @@ const TestCaseReviewPage: React.FC = () => {
       test_data: step.test_data || ""
     })) || [];
 
-    setEditForm({ 
+    setEditForm({
       ...testCase,
       test_steps: normalizedTestSteps
     });
@@ -102,11 +110,11 @@ const TestCaseReviewPage: React.FC = () => {
 
     // Validate test steps
     const errors: string[] = [];
-    
+
     if (!editForm.title?.trim()) {
       errors.push("Title is required");
     }
-    
+
     if (!editForm.test_steps || editForm.test_steps.length === 0) {
       errors.push("At least one test step is required");
     } else {
@@ -121,8 +129,8 @@ const TestCaseReviewPage: React.FC = () => {
     }
 
     if (errors.length > 0) {
-      enqueueSnackbar(`Validation errors: ${errors.join(", ")}`, { 
-        variant: "error" 
+      enqueueSnackbar(`Validation errors: ${errors.join(", ")}`, {
+        variant: "error"
       });
       return;
     }
@@ -151,7 +159,15 @@ const TestCaseReviewPage: React.FC = () => {
 
     try {
       await TestCaseService.deleteTestCase(selectedTestCase.id.toString());
-      setTestCases(testCases.filter((tc) => tc.id !== selectedTestCase.id));
+      const newList = testCases.filter((tc) => tc.id !== selectedTestCase.id);
+      setTestCases(newList);
+
+      // adjust current page if necessary (for example if last item on last page was deleted)
+      const totalPagesAfterDelete = Math.max(1, Math.ceil(newList.length / ITEMS_PER_PAGE));
+      if (currentPage > totalPagesAfterDelete) {
+        setCurrentPage(totalPagesAfterDelete);
+      }
+
       setDeleteDialogOpen(false);
       enqueueSnackbar("Test case deleted successfully", { variant: "success" });
     } catch (error) {
@@ -164,7 +180,7 @@ const TestCaseReviewPage: React.FC = () => {
   const handlePushToZephyr = async (testCase: TestCase) => {
     // Check if test case has a JIRA issue key
     let jiraId = testCase.jira_issue_key;
-    
+
     // If no JIRA issue key, try to extract from tags
     if (!jiraId && testCase.tags && testCase.tags.length > 0) {
       // Look for JIRA/SCRUM pattern in tags (e.g., "SCRUM-22", "PROJ-123")
@@ -178,24 +194,24 @@ const TestCaseReviewPage: React.FC = () => {
         }
       }
     }
-    
+
     if (!jiraId) {
       enqueueSnackbar(
-        "No JIRA issue key found. Please ensure the test case is linked to a JIRA ticket.", 
+        "No JIRA issue key found. Please ensure the test case is linked to a JIRA ticket.",
         { variant: "warning" }
       );
       return;
     }
-    
+
     try {
       // Format the request according to backend API
       const request = ZephyrService.formatTestCaseForZephyr(testCase, jiraId);
-      
+
       // Push to Zephyr
       const response = await ZephyrService.pushTestCase(request);
-      
+
       enqueueSnackbar(
-        `Test case pushed to Zephyr successfully! Test case key: ${response.testcase_key} (linked to ${jiraId})`, 
+        `Test case pushed to Zephyr successfully! Test case key: ${response.testcase_key} (linked to ${jiraId})`,
         { variant: "success" }
       );
     } catch (error) {
@@ -207,27 +223,30 @@ const TestCaseReviewPage: React.FC = () => {
     }
   };
 
-  // Highlight and scroll effect
+  // Highlight+params effect (keeps same behaviour)
   useEffect(() => {
     // Check for highlight parameter
     const highlightId = searchParams.get('highlight');
     const shouldFocus = searchParams.get('focus') === 'true';
     const source = searchParams.get('source');
-    
+
     if (highlightId) {
       setHighlightedTestCaseId(highlightId);
-      setShouldScrollToHighlighted(shouldFocus);
+      // don't set shouldScrollToHighlighted here — we'll set it after ensuring the page is correct
+      if (shouldFocus) {
+        setShouldScrollToHighlighted(true);
+      }
     }
-    
+
     // If coming from generator with session data
     if (source === 'generator') {
       const pendingTestCases = sessionStorage.getItem('pendingReviewTestCases');
       if (pendingTestCases) {
         try {
-          const testCases = JSON.parse(pendingTestCases);
+          const testCasesFromSession = JSON.parse(pendingTestCases);
           // Merge with existing test cases or handle as needed
-          if (testCases.length > 0) {
-            setHighlightedTestCaseId(testCases[0].id);
+          if (testCasesFromSession.length > 0) {
+            setHighlightedTestCaseId(testCasesFromSession[0].id);
             setShouldScrollToHighlighted(true);
           }
           // Clear session storage
@@ -239,15 +258,31 @@ const TestCaseReviewPage: React.FC = () => {
     }
   }, [searchParams, location]);
 
-  // Add scroll effect
+  // If a highlighted test case exists and testCases are loaded,
+  // ensure the page shows that test case (so scrollIntoView will find it)
+  useEffect(() => {
+    if (!highlightedTestCaseId || testCases.length === 0) return;
+
+    const index = testCases.findIndex(tc => tc.id?.toString() === highlightedTestCaseId);
+    if (index >= 0) {
+      const pageForHighlighted = Math.floor(index / ITEMS_PER_PAGE) + 1;
+      if (pageForHighlighted !== currentPage) {
+        setCurrentPage(pageForHighlighted);
+      }
+      // ensure scroll happens after render (shouldScrollToHighlighted may already be true)
+      setShouldScrollToHighlighted(true);
+    }
+  }, [highlightedTestCaseId, testCases]);
+
+  // Scroll-to-highlight effect (unchanged)
   useEffect(() => {
     if (shouldScrollToHighlighted && highlightedTestCaseId) {
       const timer = setTimeout(() => {
         const element = document.getElementById(`test-case-${highlightedTestCaseId}`);
         if (element) {
-          element.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center' 
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
           });
         }
         setShouldScrollToHighlighted(false);
@@ -265,7 +300,7 @@ const TestCaseReviewPage: React.FC = () => {
       expected_result: "",
       test_data: ""
     };
-    
+
     setEditForm({
       ...editForm,
       test_steps: [...(editForm.test_steps || []), newStep]
@@ -279,7 +314,7 @@ const TestCaseReviewPage: React.FC = () => {
       ...step,
       step_number: i + 1
     }));
-    
+
     setEditForm({
       ...editForm,
       test_steps: renumberedSteps
@@ -292,11 +327,30 @@ const TestCaseReviewPage: React.FC = () => {
       ...updatedSteps[index],
       [field]: value
     };
-    
+
     setEditForm({
       ...editForm,
       test_steps: updatedSteps
     });
+  };
+
+  // Derived values for pagination
+  const totalPages = Math.max(1, Math.ceil(testCases.length / ITEMS_PER_PAGE));
+  // ensure currentPage is within bounds (if testCases length changed)
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages]);
+
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const displayedTestCases = testCases.slice(startIndex, endIndex);
+
+  const handlePageChange = (_: React.ChangeEvent<unknown>, page: number) => {
+    setCurrentPage(page);
+    // optionally ensure any previous highlight scroll is reset
+    setShouldScrollToHighlighted(false);
   };
 
   if (loading) {
@@ -319,8 +373,7 @@ const TestCaseReviewPage: React.FC = () => {
 
   return (
     <Box>
-      <Typography variant="h1" gutterBottom
-      sx={{ mt: 6.5 }}>
+      <Typography variant="h1" gutterBottom sx={{ mt: 6.5 }}>
         Review & Edit Test Cases
       </Typography>
 
@@ -335,116 +388,139 @@ const TestCaseReviewPage: React.FC = () => {
           here.
         </Alert>
       ) : (
-        <Grid container spacing={3}>
-          {testCases.map((testCase) => (
-            <Grid item xs={12} key={testCase.id}>
-              <Card
-                id={`test-case-${testCase.id}`} // Add ID for scrolling
-                sx={{
-                  // Add highlighting styles
-                  ...(highlightedTestCaseId === testCase.id?.toString() && {
-                    border: '2px solid',
-                    borderColor: 'primary.main',
-                    boxShadow: (theme) => `0 0 20px ${theme.palette.primary.main}40`,
-                    backgroundColor: (theme) => `${theme.palette.primary.main}08`,
-                  }),
-                  transition: 'all 0.3s ease-in-out',
-                }}
-              >
-                <CardContent>
-                  {/* Add a highlighted badge if this is the highlighted test case */}
-                  {highlightedTestCaseId === testCase.id?.toString() && (
-                    <Box sx={{ mb: 2 }}>
-                      <Chip 
-                        label="Recently Generated" 
-                        color="primary" 
-                        size="small"
-                        icon={<EditIcon />}
-                      />
-                    </Box>
-                  )}
-                  
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      mb: 2,
-                    }}
-                  >
-                    <Box>
-                      <Typography variant="h6" gutterBottom>
-                        {testCase.title}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        paragraph
-                      >
-                        {testCase.description}
-                      </Typography>
-                      <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+        <>
+          <Grid container spacing={3}>
+            {displayedTestCases.map((testCase) => (
+              <Grid item xs={12} key={testCase.id}>
+                <Card
+                  id={`test-case-${testCase.id}`} // Add ID for scrolling
+                  sx={{
+                    // Add highlighting styles
+                    ...(highlightedTestCaseId === testCase.id?.toString() && {
+                      border: '2px solid',
+                      borderColor: 'primary.main',
+                      boxShadow: (theme) => `0 0 20px ${theme.palette.primary.main}40`,
+                      backgroundColor: (theme) => `${theme.palette.primary.main}08`,
+                    }),
+                    transition: 'all 0.3s ease-in-out',
+                  }}
+                >
+                  <CardContent>
+                    {/* Add a highlighted badge if this is the highlighted test case */}
+                    {highlightedTestCaseId === testCase.id?.toString() && (
+                      <Box sx={{ mb: 2 }}>
                         <Chip
-                          label={testCase.priority}
+                          label="Recently Generated"
+                          color="primary"
                           size="small"
-                          color={
-                            testCase.priority === "critical"
-                              ? "error"
-                              : testCase.priority === "high"
-                              ? "warning"
-                              : testCase.priority === "medium"
-                              ? "info"
-                              : "default"
-                          }
+                          icon={<EditIcon />}
                         />
-                        <Chip
-                          label={testCase.status || "draft"}
+                      </Box>
+                    )}
+
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        mb: 2,
+                      }}
+                    >
+                      <Box>
+                        <Typography variant="h6" gutterBottom>
+                          {testCase.title}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          paragraph
+                          sx={{
+                            textAlign: "justify",
+                            maxHeight: 100, // limit height
+                            maxWidth: 500, // limit width
+                            lineHeight: 1.6,
+                            minWidth: 0,
+                            hyphens: "auto",
+                          }}
+                        >
+                          {testCase.description}
+                        </Typography>
+                        <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+                          <Chip
+                            label={testCase.priority}
+                            size="small"
+                            color={
+                              testCase.priority === "critical"
+                                ? "error"
+                                : testCase.priority === "high"
+                                ? "warning"
+                                : testCase.priority === "medium"
+                                ? "info"
+                                : "default"
+                            }
+                          />
+                          <Chip
+                            label={testCase.status || "draft"}
+                            size="small"
+                            variant="outlined"
+                          />
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
+                        <Button
                           size="small"
-                          variant="outlined"
-                        />
+                          startIcon={<EditIcon />}
+                          onClick={() => handleEdit(testCase)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="small"
+                          startIcon={<PushIcon />}
+                          variant="contained"
+                          onClick={() => handlePushToZephyr(testCase)}
+                        >
+                          Push to Zephyr
+                        </Button>
+                        <Button
+                          size="small"
+                          startIcon={<DeleteIcon />}
+                          color="error"
+                          onClick={() => handleDelete(testCase)}
+                        >
+                          Delete
+                        </Button>
                       </Box>
                     </Box>
 
-                    <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
-                      <Button
-                        size="small"
-                        startIcon={<EditIcon />}
-                        onClick={() => handleEdit(testCase)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="small"
-                        startIcon={<PushIcon />}
-                        variant="contained"
-                        onClick={() => handlePushToZephyr(testCase)}
-                      >
-                        Push to Zephyr
-                      </Button>
-                      <Button
-                        size="small"
-                        startIcon={<DeleteIcon />}
-                        color="error"
-                        onClick={() => handleDelete(testCase)}
-                      >
-                        Delete
-                      </Button>
-                    </Box>
-                  </Box>
+                    <TestCasePreview testCases={[testCase]} variant="compact" />
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
 
-                  <TestCasePreview testCases={[testCase]} variant="compact" />
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+          {/* Pagination controls */}
+          <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={handlePageChange}
+              color="primary"
+              shape="rounded"
+              showFirstButton
+              showLastButton
+            />
+          </Box>
+        </>
       )}
 
-      {/* Enhanced Edit Dialog */}
+      {/* Edit Dialog (unchanged) */}
       <Dialog
         open={editDialogOpen}
         onClose={() => setEditDialogOpen(false)}
-        maxWidth="lg" // Changed from "md" to "lg" for more space
+        maxWidth="lg"
         fullWidth
       >
         <DialogTitle>Edit Test Case</DialogTitle>
@@ -456,7 +532,7 @@ const TestCaseReviewPage: React.FC = () => {
                 Basic Information
               </Typography>
             </Grid>
-            
+
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -467,7 +543,7 @@ const TestCaseReviewPage: React.FC = () => {
                 }
               />
             </Grid>
-            
+
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -578,7 +654,7 @@ const TestCaseReviewPage: React.FC = () => {
                       Remove
                     </Button>
                   </Box>
-                  
+
                   <Grid container spacing={2}>
                     <Grid item xs={12}>
                       <TextField
@@ -591,7 +667,7 @@ const TestCaseReviewPage: React.FC = () => {
                         rows={2}
                       />
                     </Grid>
-                    
+
                     <Grid item xs={12} md={6}>
                       <TextField
                         fullWidth
@@ -601,7 +677,7 @@ const TestCaseReviewPage: React.FC = () => {
                         onChange={(e) => updateTestStep(index, "test_data", e.target.value)}
                       />
                     </Grid>
-                    
+
                     <Grid item xs={12} md={6}>
                       <TextField
                         fullWidth
@@ -639,9 +715,9 @@ const TestCaseReviewPage: React.FC = () => {
                 label="Tags (comma-separated)"
                 value={editForm.tags?.join(", ") || ""}
                 onChange={(e) =>
-                  setEditForm({ 
-                    ...editForm, 
-                    tags: e.target.value.split(",").map(tag => tag.trim()).filter(tag => tag) 
+                  setEditForm({
+                    ...editForm,
+                    tags: e.target.value.split(",").map(tag => tag.trim()).filter(tag => tag)
                   })
                 }
                 placeholder="authentication, login, security"
@@ -649,13 +725,13 @@ const TestCaseReviewPage: React.FC = () => {
             </Grid>
           </Grid>
         </DialogContent>
-        
+
         <DialogActions sx={{ p: 3 }}>
           <Button onClick={() => setEditDialogOpen(false)}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleSaveEdit} 
+          <Button
+            onClick={handleSaveEdit}
             variant="contained"
             disabled={!editForm.title?.trim() || !editForm.test_steps?.length}
           >

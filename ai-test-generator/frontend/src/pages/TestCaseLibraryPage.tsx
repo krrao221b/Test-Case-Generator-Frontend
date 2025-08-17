@@ -14,6 +14,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Pagination, // <- added
 } from "@mui/material";
 import { Search as SearchIcon, Add as AddIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -28,6 +29,8 @@ import { TestCaseService } from "../services";
 // Types
 import type { TestCase } from "../types";
 
+const ITEMS_PER_PAGE = 5; // 5 items per page as requested
+
 const TestCaseLibraryPage: React.FC = () => {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
@@ -41,6 +44,9 @@ const TestCaseLibraryPage: React.FC = () => {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
   // Fetch test cases on component mount
   useEffect(() => {
     fetchTestCases();
@@ -49,6 +55,8 @@ const TestCaseLibraryPage: React.FC = () => {
   // Filter test cases when search term or filters change
   useEffect(() => {
     filterTestCases();
+    // Reset to page 1 whenever filters/search change
+    setCurrentPage(1);
   }, [testCases, searchTerm, priorityFilter, statusFilter]);
 
   const fetchTestCases = async () => {
@@ -75,9 +83,9 @@ const TestCaseLibraryPage: React.FC = () => {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (testCase) =>
-          testCase.title.toLowerCase().includes(term) ||
-          testCase.description.toLowerCase().includes(term) ||
-          testCase.feature_description.toLowerCase().includes(term)
+          (testCase.title || "").toLowerCase().includes(term) ||
+          (testCase.description || "").toLowerCase().includes(term) ||
+          (testCase.feature_description || "").toLowerCase().includes(term)
       );
     }
 
@@ -90,12 +98,32 @@ const TestCaseLibraryPage: React.FC = () => {
 
     // Filter by status
     if (statusFilter !== "all") {
-      filtered = filtered.filter(
-        (testCase) => testCase.status === statusFilter
-      );
+      filtered = filtered.filter((testCase) => testCase.status === statusFilter);
     }
 
     setFilteredTestCases(filtered);
+  };
+
+  // Derived pagination values
+  const totalPages = Math.max(1, Math.ceil(filteredTestCases.length / ITEMS_PER_PAGE));
+  // Clamp currentPage if filteredTestCases shrink
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const displayedTestCases = filteredTestCases.slice(startIndex, endIndex);
+
+  const handlePageChange = (_: React.ChangeEvent<unknown>, page: number) => {
+    setCurrentPage(page);
+    // scroll to top of list area (optional UX improvement)
+    const anchor = document.getElementById("testcase-library-top");
+    if (anchor) {
+      anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   };
 
   if (loading) {
@@ -138,6 +166,9 @@ const TestCaseLibraryPage: React.FC = () => {
 
   return (
     <Box>
+      {/* anchor for pagination scroll */}
+      <Box id="testcase-library-top" />
+
       <Box
         sx={{
           display: "flex",
@@ -304,7 +335,22 @@ const TestCaseLibraryPage: React.FC = () => {
               {filteredTestCases.length !== 1 ? "s" : ""} found
             </Typography>
           </Box>
-          <TestCasePreview testCases={filteredTestCases} />
+
+          {/* pass only the paged subset to the preview */}
+          <TestCasePreview testCases={displayedTestCases} />
+
+          {/* Pagination controls */}
+          <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={handlePageChange}
+              color="primary"
+              shape="rounded"
+              showFirstButton
+              showLastButton
+            />
+          </Box>
         </>
       )}
     </Box>
