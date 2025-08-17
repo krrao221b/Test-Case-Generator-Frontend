@@ -69,6 +69,7 @@ const HomePage: React.FC = () => {
           p: 6,
           mb: 4,
           borderRadius: 2,
+          mt: 6.5,
         }}
       >
         <Typography variant="h1" gutterBottom>
