@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { JiraService } from '../services';
 import type { JiraTicket, SimilarTestCase } from '../types';
 
@@ -6,6 +6,7 @@ interface UseJiraReturn {
   ticket: JiraTicket | null;
   similarCases: SimilarTestCase[];
   loading: boolean;
+  similarLoading: boolean;
   error: string | null;
   fetchTicket: (ticketIdOrUrl: string) => Promise<void>;
   clearTicket: () => void;
@@ -20,7 +21,9 @@ export const useJira = (): UseJiraReturn => {
   const [ticket, setTicket] = useState<JiraTicket | null>(null);
   const [similarCases, setSimilarCases] = useState<SimilarTestCase[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [similarLoading, setSimilarLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const lastTicketKeyRef = useRef<string | null>(null);
 
   const fetchTicket = useCallback(async (ticketIdOrUrl: string): Promise<void> => {
     if (!ticketIdOrUrl.trim()) {
@@ -32,7 +35,7 @@ export const useJira = (): UseJiraReturn => {
     setError(null);
     
     try {
-      // Try to parse as URL first, then use as ticket ID
+  // Try to parse as URL first, then use as ticket ID
       let ticketId = JiraService.parseTicketUrl(ticketIdOrUrl);
       if (!ticketId) {
         ticketId = ticketIdOrUrl.trim().toUpperCase();
@@ -43,9 +46,25 @@ export const useJira = (): UseJiraReturn => {
         throw new Error('Invalid Jira ticket ID format (expected: ABC-123)');
       }
 
-  const { ticket: fetchedTicket, similar_cases } = await JiraService.getTicket(ticketId);
-  setTicket(fetchedTicket);
-  setSimilarCases(similar_cases || []);
+      // Mark the ticket we are about to fetch for stale-guarding
+      lastTicketKeyRef.current = ticketId;
+
+      // First, fetch ticket without similar cases for faster response
+      const { ticket: fetchedTicket } = await JiraService.getTicket(ticketId, {
+        includeSimilar: false,
+      });
+      setTicket(fetchedTicket);
+
+      // Then, load similar cases asynchronously (non-blocking UI)
+      setSimilarLoading(true);
+      JiraService.getTicket(ticketId, { includeSimilar: true })
+        .then(({ similar_cases }) => {
+          if (lastTicketKeyRef.current === ticketId) {
+            setSimilarCases(similar_cases || []);
+          }
+        })
+        .catch((err) => console.warn("Deferred similar-cases fetch failed:", err))
+        .finally(() => setSimilarLoading(false));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch Jira ticket';
       setError(errorMessage);
@@ -56,9 +75,11 @@ export const useJira = (): UseJiraReturn => {
   }, []);
 
   const clearTicket = useCallback(() => {
-    setTicket(null);
-    setError(null);
+  setTicket(null);
+  setError(null);
   setSimilarCases([]);
+  setSimilarLoading(false);
+  lastTicketKeyRef.current = null;
   }, []);
 
   const parseTicketUrl = useCallback((url: string): string | null => {
@@ -73,6 +94,7 @@ export const useJira = (): UseJiraReturn => {
     ticket,
   similarCases,
     loading,
+  similarLoading,
     error,
     fetchTicket,
     clearTicket,

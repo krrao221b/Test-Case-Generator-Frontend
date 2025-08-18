@@ -9,10 +9,21 @@ export class JiraService {
   /**
    * Fetch Jira ticket by ID or key
    */
-  static async getTicket(ticketIdOrKey: string): Promise<JiraTicketWithSimilar> {
+  static async getTicket(
+    ticketIdOrKey: string,
+    options?: { includeSimilar?: boolean; limit?: number; threshold?: number }
+  ): Promise<JiraTicketWithSimilar> {
     try {
-  const response = await apiClient.get<any>(
-        `${API_ENDPOINTS.JIRA_TICKET}/${ticketIdOrKey}`
+      const params = new URLSearchParams();
+      const includeSimilar = options?.includeSimilar ?? true;
+      const limit = options?.limit ?? 5;
+      const threshold = options?.threshold ?? 0.7;
+      params.set("include_similar", String(includeSimilar));
+      params.set("limit", String(limit));
+      params.set("threshold", String(threshold));
+
+      const response = await apiClient.get<any>(
+        `${API_ENDPOINTS.JIRA_TICKET}/${ticketIdOrKey}?${params.toString()}`
       );
 
       if (!response.success) {
@@ -41,11 +52,10 @@ export class JiraService {
         attachments: backendData.attachments || [],
       };
 
-      const similar: SimilarTestCase[] = backendSimilar
-        .map((sc) => ({
-          test_case: sc.test_case as any,
-          similarity_score: sc.similarity_score,
-        }));
+      const similar: SimilarTestCase[] = backendSimilar.map((sc) => ({
+        test_case: sc.test_case as any,
+        similarity_score: sc.similarity_score,
+      }));
 
       return { ticket: jiraTicket, similar_cases: similar };
     } catch (error) {

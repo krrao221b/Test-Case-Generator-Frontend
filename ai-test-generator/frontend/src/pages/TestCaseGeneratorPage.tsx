@@ -82,7 +82,8 @@ const TestCaseGeneratorPage: React.FC = () => {
   const {
     ticket,
     similarCases,
-    loading: jiraLoading,
+  loading: jiraLoading,
+  similarLoading,
     error: jiraError,
     fetchTicket,
   } = useJira();
@@ -283,6 +284,7 @@ const TestCaseGeneratorPage: React.FC = () => {
                 onSubmit={handleJiraSubmit}
                 onGenerate={handleJiraGenerate}
                 loading={jiraLoading || generating}
+                similarLoading={similarLoading}
                 error={jiraError}
                 ticket={ticket}
                 similarCases={similarCases}
