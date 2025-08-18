@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react';
 import { JiraService } from '../services';
-import type { JiraTicket } from '../types';
+import type { JiraTicket, SimilarTestCase } from '../types';
 
 interface UseJiraReturn {
   ticket: JiraTicket | null;
+  similarCases: SimilarTestCase[];
   loading: boolean;
   error: string | null;
   fetchTicket: (ticketIdOrUrl: string) => Promise<void>;
@@ -17,6 +18,7 @@ interface UseJiraReturn {
  */
 export const useJira = (): UseJiraReturn => {
   const [ticket, setTicket] = useState<JiraTicket | null>(null);
+  const [similarCases, setSimilarCases] = useState<SimilarTestCase[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,8 +43,9 @@ export const useJira = (): UseJiraReturn => {
         throw new Error('Invalid Jira ticket ID format (expected: ABC-123)');
       }
 
-      const fetchedTicket = await JiraService.getTicket(ticketId);
-      setTicket(fetchedTicket);
+  const { ticket: fetchedTicket, similar_cases } = await JiraService.getTicket(ticketId);
+  setTicket(fetchedTicket);
+  setSimilarCases(similar_cases || []);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch Jira ticket';
       setError(errorMessage);
@@ -55,6 +58,7 @@ export const useJira = (): UseJiraReturn => {
   const clearTicket = useCallback(() => {
     setTicket(null);
     setError(null);
+  setSimilarCases([]);
   }, []);
 
   const parseTicketUrl = useCallback((url: string): string | null => {
@@ -67,6 +71,7 @@ export const useJira = (): UseJiraReturn => {
 
   return {
     ticket,
+  similarCases,
     loading,
     error,
     fetchTicket,

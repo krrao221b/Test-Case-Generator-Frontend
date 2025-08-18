@@ -1,6 +1,6 @@
 import { apiClient } from "./apiClient";
 import { API_ENDPOINTS } from "../constants";
-import type { JiraTicket } from "../types";
+import type { JiraTicket, JiraTicketWithSimilar, SimilarTestCase } from "../types";
 
 /**
  * Service for Jira integration
@@ -9,9 +9,9 @@ export class JiraService {
   /**
    * Fetch Jira ticket by ID or key
    */
-  static async getTicket(ticketIdOrKey: string): Promise<JiraTicket> {
+  static async getTicket(ticketIdOrKey: string): Promise<JiraTicketWithSimilar> {
     try {
-      const response = await apiClient.get<any>(
+  const response = await apiClient.get<any>(
         `${API_ENDPOINTS.JIRA_TICKET}/${ticketIdOrKey}`
       );
 
@@ -19,8 +19,13 @@ export class JiraService {
         throw new Error(response.error || "Failed to fetch Jira ticket");
       }
 
-      // Map backend response to frontend JiraTicket type
-      const backendData = response.data;
+      // Backend now returns { jira_ticket_data, similar_cases }
+      const payload = response.data;
+      const backendData = payload?.jira_ticket_data || payload;
+      const backendSimilar = (payload?.similar_cases || []) as Array<{
+        test_case: any;
+        similarity_score: number;
+      }>;
       const jiraTicket: JiraTicket = {
         id: backendData.key, // Use key as id since backend doesn't return separate id
         key: backendData.key,
@@ -36,7 +41,13 @@ export class JiraService {
         attachments: backendData.attachments || [],
       };
 
-      return jiraTicket;
+      const similar: SimilarTestCase[] = backendSimilar
+        .map((sc) => ({
+          test_case: sc.test_case as any,
+          similarity_score: sc.similarity_score,
+        }));
+
+      return { ticket: jiraTicket, similar_cases: similar };
     } catch (error) {
       console.error("Error fetching Jira ticket:", error);
       throw error;

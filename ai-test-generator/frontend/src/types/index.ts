@@ -60,6 +60,12 @@ export interface GenerateTestCaseResponse {
   generation_metadata: { [key: string]: any };
 }
 
+// Jira fetch response that includes similar cases from backend
+export interface JiraTicketWithSimilar {
+  ticket: JiraTicket;
+  similar_cases: SimilarTestCase[];
+}
+
 export interface ZephyrPushRequest {
   jira_id: string;
   testcase_name?: string;

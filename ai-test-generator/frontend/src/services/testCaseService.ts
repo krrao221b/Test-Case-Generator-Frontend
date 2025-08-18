@@ -54,6 +54,47 @@ export class TestCaseService {
   }
 
   /**
+   * Force-generate a brand new test case regardless of duplicate detection.
+   * Uses the backend's /test-cases/generate-new endpoint.
+   */
+  static async generateNewTestCase(
+    request: GenerateTestCaseRequest
+  ): Promise<GenerateTestCaseResponse> {
+    try {
+      const response = await apiClient.post<GenerateTestCaseResponse>(
+        API_ENDPOINTS.GENERATE_TEST_CASES_NEW,
+        request
+      );
+
+      if (!response.success) {
+        throw new Error(response.error || "Failed to force-generate test case");
+      }
+
+      if (
+        response.data &&
+        typeof response.data === "object" &&
+        "test_case" in response.data
+      ) {
+        return response.data as GenerateTestCaseResponse;
+      }
+
+      const dataAsAny = response.data as any;
+      if (dataAsAny && dataAsAny.success && dataAsAny.data) {
+        return dataAsAny.data as GenerateTestCaseResponse;
+      }
+
+      if (response.data && typeof response.data === "object") {
+        return response.data as GenerateTestCaseResponse;
+      }
+
+      throw new Error("Invalid response format from server");
+    } catch (error) {
+      console.error("Error force-generating test case:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Get all saved test cases
    */
   static async getAllTestCases(): Promise<TestCase[]> {

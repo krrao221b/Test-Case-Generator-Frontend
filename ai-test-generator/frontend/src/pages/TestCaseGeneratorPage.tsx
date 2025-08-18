@@ -81,6 +81,7 @@ const TestCaseGeneratorPage: React.FC = () => {
   // Hooks
   const {
     ticket,
+    similarCases,
     loading: jiraLoading,
     error: jiraError,
     fetchTicket,
@@ -101,6 +102,9 @@ const TestCaseGeneratorPage: React.FC = () => {
   };
 
   const handleGenerate = async (request: GenerateTestCaseRequest) => {
+  // Keep a copy of the request so the Duplicate dialog's "Generate New"
+  // can re-use it (works for both Jira and Manual flows)
+  setPendingRequest(request);
     setGenerating(true);
 
     try {
@@ -167,12 +171,6 @@ const TestCaseGeneratorPage: React.FC = () => {
     }
   };
 
-  // Add function to clear ticket when input changes
-  const handleClearTicket = () => {
-    // This should clear the ticket in useJira hook
-    // You'll need to add clearTicket method to useJira
-  };
-
   const handleManualSubmit = async (data: {
     acceptanceCriteria: string;
     featureRequirements: string;
@@ -230,18 +228,28 @@ const TestCaseGeneratorPage: React.FC = () => {
             variant="outlined"
             color="secondary"
             onClick={async () => {
-              // Force new generation by adding a random tag or context
-              if (pendingRequest) {
-                const newRequest = {
-                  ...pendingRequest,
-                  additional_context:
-                    (pendingRequest.additional_context || "") +
-                    " [force new generation " +
-                    Date.now() +
-                    "]",
-                };
+              if (!pendingRequest) {
                 setDuplicateDialogOpen(false);
-                await handleGenerate(newRequest);
+                return;
+              }
+              try {
+                // Close the dialog immediately for better UX and start generation in background
+                setDuplicateDialogOpen(false);
+                setGenerating(true);
+                // Call dedicated backend endpoint to generate a brand new test case
+                const resp = await TestCaseService.generateNewTestCase(pendingRequest);
+                // The backend returns a single test_case; show it and close dialog
+                setGeneratedTestCases([resp.test_case]);
+                setSimilarTestCases((resp.similar_cases || []).map(sc => sc.test_case));
+                enqueueSnackbar(
+                  `Generated new test case: ${resp.test_case.title}`,
+                  { variant: "success" }
+                );
+              } catch (e) {
+                const message = e instanceof Error ? e.message : "Unknown error";
+                enqueueSnackbar(`Error generating new test case: ${message}`, { variant: "error" });
+              } finally {
+                setGenerating(false);
               }
             }}
           >
@@ -277,6 +285,7 @@ const TestCaseGeneratorPage: React.FC = () => {
                 loading={jiraLoading || generating}
                 error={jiraError}
                 ticket={ticket}
+                similarCases={similarCases}
               />
             </TabPanel>
 
@@ -388,6 +397,25 @@ const TestCaseGeneratorPage: React.FC = () => {
                 <Typography variant="body2" color="text.secondary">
                   Fill in the form on the left to start generating test cases.
                 </Typography>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Show similar cases from Jira fetch when available and nothing generated yet */}
+          {!generating && generatedTestCases.length === 0 && similarCases && similarCases.length > 0 && (
+            <Card sx={{ mt: 2 }}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Similar Test Cases Found
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  These existing test cases might be relevant to the fetched Jira ticket.
+                </Typography>
+
+                <TestCasePreview
+                  testCases={similarCases.map(sc => sc.test_case)}
+                  variant="compact"
+                />
               </CardContent>
             </Card>
           )}

@@ -14,7 +14,7 @@ import {
   AccordionDetails,
 } from "@mui/material";
 import { ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
-import type { JiraTicket } from "../types";
+import type { JiraTicket, SimilarTestCase } from "../types";
 
 interface JiraInputFormProps {
   onSubmit: (ticketIdOrUrl: string) => Promise<void>;
@@ -22,6 +22,7 @@ interface JiraInputFormProps {
   loading: boolean;
   error: string | null;
   ticket: JiraTicket | null;
+  similarCases?: SimilarTestCase[];
 }
 
 const JiraInputForm: React.FC<JiraInputFormProps> = ({
@@ -30,6 +31,7 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
   loading,
   error,
   ticket,
+  similarCases = [],
 }) => {
   const [input, setInput] = useState<string>("");
 
@@ -153,8 +155,28 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
 
             {/* Success message */}
             <Alert severity="success" sx={{ mt: 2 }}>
-              Ticket fetched successfully! Click "Generate Test Cases" to proceed.
+              Ticket fetched successfully! Click "Generate Test Cases" to
+              proceed.
             </Alert>
+
+            {/* Similar cases preview (if any) */}
+            {similarCases.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Similar Test Cases Found
+                </Typography>
+                <Box component="ul" sx={{ pl: 3, m: 0 }}>
+                  {similarCases.slice(0, 5).map((sc, idx) => (
+                    <li key={idx}>
+                      <Typography variant="body2" color="text.secondary">
+                        {sc.test_case.title} (Similarity Score:{" "}
+                        {Math.round(sc.similarity_score * 100)}%)
+                      </Typography>
+                    </li>
+                  ))}
+                </Box>
+              </Box>
+            )}
           </CardContent>
         </Card>
       )}

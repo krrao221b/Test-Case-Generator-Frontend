@@ -10,6 +10,7 @@ export const API_BASE_URL =
 export const API_ENDPOINTS = {
   // Test case generation
   GENERATE_TEST_CASES: "/api/v1/test-cases/generate",
+  GENERATE_TEST_CASES_NEW: "/api/v1/test-cases/generate-new",
 
   // Jira integration
   JIRA_TICKET: "/api/v1/integrations/jira",
