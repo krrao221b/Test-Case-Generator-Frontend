@@ -12,9 +12,11 @@ import {
   ListItem,
   ListItemText,
   Divider,
+  Button,
 } from "@mui/material";
 import { ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
 import type { TestCase } from "../types";
+import { useNavigate } from "react-router-dom";
 
 interface TestCasePreviewProps {
   testCases: TestCase[];
@@ -25,6 +27,7 @@ const TestCasePreview: React.FC<TestCasePreviewProps> = ({
   testCases,
   variant = "full",
 }) => {
+  const navigate = useNavigate();
   if (testCases.length === 0) {
     return (
       <Box sx={{ textAlign: "center", py: 4 }}>
@@ -58,6 +61,14 @@ const TestCasePreview: React.FC<TestCasePreviewProps> = ({
                       : "default"
                   }
                 />
+                <Button
+                  size="small"
+                  variant="outlined"
+                  sx={{ ml: 1 }}
+                  onClick={() => navigate(`/review?highlight=${testCase.id}&focus=true`)}
+                >
+                  Review & Edit
+                </Button>
               </Box>
             </CardContent>
           </Card>
@@ -153,6 +164,16 @@ const TestCasePreview: React.FC<TestCasePreviewProps> = ({
                 </React.Fragment>
               ))}
             </List>
+
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => navigate(`/review?highlight=${testCase.id}&focus=true`)}
+              >
+                Review & Edit
+              </Button>
+            </Box>
           </AccordionDetails>
         </Accordion>
       ))}
