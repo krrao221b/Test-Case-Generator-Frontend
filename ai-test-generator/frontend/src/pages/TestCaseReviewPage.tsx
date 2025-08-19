@@ -58,6 +58,7 @@ const TestCaseReviewPage: React.FC = () => {
 
   // Form state for editing
   const [editForm, setEditForm] = useState<Partial<TestCase>>({});
+  const [pushingId, setPushingId] = useState<string | null>(null);
 
   // Search params and location
   const [searchParams] = useSearchParams();
@@ -233,6 +234,8 @@ const TestCaseReviewPage: React.FC = () => {
     }
 
     try {
+      // mark this test case as pushing so the UI can show a loader
+      setPushingId(testCase.id?.toString() || null);
       // Format the request according to backend API
       const request = ZephyrService.formatTestCaseForZephyr(testCase, jiraId);
 
@@ -249,6 +252,10 @@ const TestCaseReviewPage: React.FC = () => {
           ? error.message
           : "Failed to push to Zephyr Scale";
       enqueueSnackbar(`Error: ${message}`, { variant: "error" });
+    }
+    finally {
+      // clear pushing state regardless of result
+      setPushingId(null);
     }
   };
 
@@ -517,11 +524,18 @@ const TestCaseReviewPage: React.FC = () => {
                         </Button>
                         <Button
                           size="small"
-                          startIcon={<PushIcon />}
+                          startIcon={
+                            pushingId === testCase.id?.toString() ? (
+                              <CircularProgress size={18} color="inherit" />
+                            ) : (
+                              <PushIcon />
+                            )
+                          }
                           variant="contained"
                           onClick={() => handlePushToZephyr(testCase)}
+                          disabled={pushingId !== null}
                         >
-                          Push to Zephyr
+                          {pushingId === testCase.id?.toString() ? 'Pushing...' : 'Push to Zephyr'}
                         </Button>
                         <Button
                           size="small"
