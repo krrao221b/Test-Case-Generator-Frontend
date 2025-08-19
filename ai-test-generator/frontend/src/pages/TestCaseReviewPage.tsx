@@ -21,6 +21,7 @@ import {
   CircularProgress,
   Pagination,
   InputAdornment,
+  IconButton,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -30,6 +31,8 @@ import {
   Remove as RemoveIcon,
   Link as LinkIcon,
   HelpOutline as HelpIcon,
+  CheckCircle as CheckCircleIcon,
+  ErrorOutline as ErrorOutlineIcon,
 } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
 import { useSearchParams, useLocation } from "react-router-dom";
@@ -38,7 +41,7 @@ import { useSearchParams, useLocation } from "react-router-dom";
 import TestCasePreview from "../components/TestCasePreview";
 
 // Services
-import { TestCaseService, ZephyrService } from "../services";
+import { TestCaseService, ZephyrService, JiraService } from "../services";
 
 // Types
 import type { TestCase, TestStep } from "../types";
@@ -63,6 +66,11 @@ const TestCaseReviewPage: React.FC = () => {
   // Form state for editing
   const [editForm, setEditForm] = useState<Partial<TestCase>>({});
   const [pushingId, setPushingId] = useState<string | null>(null);
+  // Jira key validation state
+  const [jiraKeyStatus, setJiraKeyStatus] = useState<
+    'idle' | 'checking' | 'valid' | 'invalid'
+  >('idle');
+  const [jiraKeyMessage, setJiraKeyMessage] = useState<string>("");
 
   // Search params and location
   const [searchParams] = useSearchParams();
@@ -129,6 +137,9 @@ const TestCaseReviewPage: React.FC = () => {
       ...testCase,
       test_steps: normalizedTestSteps,
     });
+  // reset jira validation for fresh edit
+  setJiraKeyStatus('idle');
+  setJiraKeyMessage('');
     setEditDialogOpen(true);
   };
 
@@ -137,6 +148,11 @@ const TestCaseReviewPage: React.FC = () => {
 
     // Validate test steps
     const errors: string[] = [];
+    // If Jira key is provided but not validated as 'valid', block save
+    if ((editForm.jira_issue_key || '').trim() && jiraKeyStatus !== 'valid') {
+      enqueueSnackbar("Please validate the Jira Issue Key before saving.", { variant: "warning" });
+      return;
+    }
 
     if (!editForm.title?.trim()) {
       errors.push("Title is required");
@@ -651,11 +667,28 @@ const TestCaseReviewPage: React.FC = () => {
                   p: 2,
                   borderRadius: 1,
                   border: (theme) => `1px solid ${theme.palette.divider}`,
-                  borderLeft: (theme) => `4px solid ${theme.palette.primary.main}`,
-                  background: (theme) =>
-                    theme.palette.mode === 'dark'
+                  borderLeft: (theme) => `4px solid ${
+                    jiraKeyStatus === 'valid'
+                      ? theme.palette.success.main
+                      : jiraKeyStatus === 'invalid'
+                      ? theme.palette.error.main
+                      : theme.palette.primary.main
+                  }`,
+                  background: (theme) => {
+                    if (jiraKeyStatus === 'valid') {
+                      return theme.palette.mode === 'dark'
+                        ? 'rgba(46,204,113,0.12)'
+                        : 'rgba(46,204,113,0.08)';
+                    }
+                    if (jiraKeyStatus === 'invalid') {
+                      return theme.palette.mode === 'dark'
+                        ? 'rgba(239,3,4,0.12)'
+                        : 'rgba(239,3,4,0.08)';
+                    }
+                    return theme.palette.mode === 'dark'
                       ? 'rgba(239,3,4,0.08)'
-                      : 'rgba(25,118,210,0.08)',
+                      : 'rgba(25,118,210,0.08)';
+                  },
                 }}
               >
                 <TextField
@@ -664,12 +697,61 @@ const TestCaseReviewPage: React.FC = () => {
                   placeholder="PROJ-123"
                   value={editForm.jira_issue_key || ""}
                   onChange={(e) =>
-                    setEditForm({ ...editForm, jira_issue_key: e.target.value })
+                    {
+                      setEditForm({ ...editForm, jira_issue_key: e.target.value });
+                      setJiraKeyStatus('idle');
+                      setJiraKeyMessage('');
+                    }
                   }
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <LinkIcon color="primary" />
+                        <Tooltip title={jiraKeyStatus === 'checking' ? 'Checking…' : 'Validate Jira key'}>
+                          <span>
+                            <IconButton
+                              aria-label="validate jira key"
+                              size="small"
+                              color={jiraKeyStatus === 'invalid' ? 'error' : jiraKeyStatus === 'valid' ? 'success' : 'primary'}
+                              disabled={jiraKeyStatus === 'checking' || !(editForm.jira_issue_key || '').trim()}
+                              onClick={async () => {
+                                const raw = (editForm.jira_issue_key || '').trim().toUpperCase();
+                                if (!raw) return;
+                                // quick format check
+                                const fmt = /^[A-Z][A-Z0-9]+-\d+$/;
+                                if (!fmt.test(raw)) {
+                                  setJiraKeyStatus('invalid');
+                                  setJiraKeyMessage('Invalid format (expected ABC-123).');
+                                  return;
+                                }
+                                setJiraKeyStatus('checking');
+                                setJiraKeyMessage('');
+                                try {
+                                  // call backend without similar cases
+                                  await JiraService.getTicket(raw, { includeSimilar: false });
+                                  setJiraKeyStatus('valid');
+                                  setJiraKeyMessage('Ticket exists');
+                                } catch (err: any) {
+                                  const status = err?.status ?? err?.originalError?.status;
+                                  if (status === 404) {
+                                    setJiraKeyStatus('invalid');
+                                    setJiraKeyMessage('Ticket not found');
+                                  } else {
+                                    setJiraKeyStatus('invalid');
+                                    setJiraKeyMessage(err?.message || 'Failed to verify');
+                                  }
+                                }
+                              }}
+                            >
+                              {jiraKeyStatus === 'valid' ? (
+                                <CheckCircleIcon fontSize="small" />
+                              ) : jiraKeyStatus === 'invalid' ? (
+                                <ErrorOutlineIcon fontSize="small" />
+                              ) : (
+                                <LinkIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
                       </InputAdornment>
                     ),
                     endAdornment: (
@@ -682,6 +764,19 @@ const TestCaseReviewPage: React.FC = () => {
                   }}
                   helperText="Format: ABC-123 (e.g., SCRUM-42)."
                 />
+                {jiraKeyStatus !== 'idle' && (
+                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {jiraKeyStatus === 'checking' && (
+                      <CircularProgress size={16} />
+                    )}
+                    {jiraKeyStatus === 'valid' && (
+                      <Chip size="small" color="success" label="Valid Jira issue" />
+                    )}
+                    {jiraKeyStatus === 'invalid' && (
+                      <Chip size="small" color="error" label={jiraKeyMessage || 'Invalid Jira issue'} />
+                    )}
+                  </Box>
+                )}
               </Box>
             </Grid>
 
@@ -905,7 +1000,11 @@ const TestCaseReviewPage: React.FC = () => {
           <Button
             onClick={handleSaveEdit}
             variant="contained"
-            disabled={!editForm.title?.trim() || !editForm.test_steps?.length}
+            disabled={
+              !editForm.title?.trim() ||
+              !editForm.test_steps?.length ||
+              (((editForm.jira_issue_key || '').trim().length > 0) && jiraKeyStatus !== 'valid')
+            }
           >
             Save Changes
           </Button>
