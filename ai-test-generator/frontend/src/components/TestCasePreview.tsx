@@ -12,6 +12,7 @@ import {
   ListItem,
   ListItemText,
   Divider,
+  Button,
 } from "@mui/material";
 import { ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
 import type { TestCase } from "../types";
@@ -19,13 +20,18 @@ import type { TestCase } from "../types";
 interface TestCasePreviewProps {
   testCases: TestCase[];
   variant?: "full" | "compact";
+  // when true, show a per-item Review & Edit button that calls onReview(id)
+  showReviewButton?: boolean;
+  onReview?: (id?: number | string) => void;
 }
 
 const TestCasePreview: React.FC<TestCasePreviewProps> = ({
   testCases,
   variant = "full",
+  showReviewButton = false,
+  onReview,
 }) => {
-  if (testCases.length === 0) {
+  if (!testCases || testCases.length === 0) {
     return (
       <Box sx={{ textAlign: "center", py: 4 }}>
         <Typography variant="body2" color="text.secondary">
@@ -58,6 +64,17 @@ const TestCasePreview: React.FC<TestCasePreviewProps> = ({
                       : "default"
                   }
                 />
+
+                {showReviewButton && testCase.id !== undefined && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    sx={{ ml: 1 }}
+                    onClick={() => onReview?.(testCase.id)}
+                  >
+                    Review & Edit
+                  </Button>
+                )}
               </Box>
             </CardContent>
           </Card>
@@ -119,40 +136,37 @@ const TestCasePreview: React.FC<TestCasePreviewProps> = ({
             </Typography>
 
             <List dense>
-              {testCase.test_steps.map((step: any, stepIndex: number) => (
+              {(testCase.test_steps || []).map((step: any, stepIndex: number) => (
                 <React.Fragment key={stepIndex}>
-                  <ListItem
-                    sx={{ flexDirection: "column", alignItems: "flex-start" }}
-                  >
+                  <ListItem sx={{ flexDirection: "column", alignItems: "flex-start" }}>
                     <ListItemText
                       primary={`Step ${step.step_number}: ${step.action}`}
                       secondary={
                         <Box component="span">
                           {step.test_data && (
-                            <Typography
-                              variant="body2"
-                              component="span"
-                              display="block"
-                            >
+                            <Typography variant="body2" component="span" display="block">
                               <strong>Test Data:</strong> {step.test_data}
                             </Typography>
                           )}
-                          <Typography
-                            variant="body2"
-                            component="span"
-                            display="block"
-                          >
-                            <strong>Expected Result:</strong>{" "}
-                            {step.expected_result}
+                          <Typography variant="body2" component="span" display="block">
+                            <strong>Expected Result:</strong> {step.expected_result}
                           </Typography>
                         </Box>
                       }
                     />
                   </ListItem>
-                  {stepIndex < testCase.test_steps.length - 1 && <Divider />}
+                  {stepIndex < (testCase.test_steps || []).length - 1 && <Divider />}
                 </React.Fragment>
               ))}
             </List>
+
+            {showReviewButton && testCase.id !== undefined && (
+              <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+                <Button variant="contained" size="small" onClick={() => onReview?.(testCase.id)}>
+                  Review & Edit
+                </Button>
+              </Box>
+            )}
           </AccordionDetails>
         </Accordion>
       ))}

@@ -12,24 +12,29 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  CircularProgress,
 } from "@mui/material";
 import { ExpandMore as ExpandMoreIcon } from "@mui/icons-material";
-import type { JiraTicket } from "../types";
+import type { JiraTicket, SimilarTestCase } from "../types";
 
 interface JiraInputFormProps {
   onSubmit: (ticketIdOrUrl: string) => Promise<void>;
   onGenerate?: () => Promise<void>; // New prop for generate action
   loading: boolean;
+  similarLoading?: boolean;
   error: string | null;
   ticket: JiraTicket | null;
+  similarCases?: SimilarTestCase[];
 }
 
 const JiraInputForm: React.FC<JiraInputFormProps> = ({
   onSubmit,
   onGenerate,
   loading,
+  similarLoading = false,
   error,
   ticket,
+  similarCases = [],
 }) => {
   const [input, setInput] = useState<string>("");
 
@@ -153,8 +158,36 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
 
             {/* Success message */}
             <Alert severity="success" sx={{ mt: 2 }}>
-              Ticket fetched successfully! Click "Generate Test Cases" to proceed.
+              Ticket fetched successfully! Click "Generate Test Cases" to
+              proceed.
             </Alert>
+
+            {/* Similar cases preview (if any) */}
+            {similarLoading && (
+              <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={16} />
+                <Typography variant="body2" color="text.secondary">
+                  Loading similar cases...
+                </Typography>
+              </Box>
+            )}
+            {similarCases.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Similar Test Cases Found
+                </Typography>
+                <Box component="ul" sx={{ pl: 3, m: 0 }}>
+                  {similarCases.slice(0, 5).map((sc, idx) => (
+                    <li key={idx}>
+                      <Typography variant="body2" color="text.secondary">
+                        {sc.test_case.title} (Similarity Score:{" "}
+                        {Math.round(sc.similarity_score * 100)}%)
+                      </Typography>
+                    </li>
+                  ))}
+                </Box>
+              </Box>
+            )}
           </CardContent>
         </Card>
       )}

@@ -81,7 +81,9 @@ const TestCaseGeneratorPage: React.FC = () => {
   // Hooks
   const {
     ticket,
-    loading: jiraLoading,
+    similarCases,
+  loading: jiraLoading,
+  similarLoading,
     error: jiraError,
     fetchTicket,
   } = useJira();
@@ -101,6 +103,9 @@ const TestCaseGeneratorPage: React.FC = () => {
   };
 
   const handleGenerate = async (request: GenerateTestCaseRequest) => {
+  // Keep a copy of the request so the Duplicate dialog's "Generate New"
+  // can re-use it (works for both Jira and Manual flows)
+  setPendingRequest(request);
     setGenerating(true);
 
     try {
@@ -161,16 +166,29 @@ const TestCaseGeneratorPage: React.FC = () => {
         tags: [ticket.key],
       };
 
-      await handleGenerate(request);
+      // For Jira flow, call the dedicated generate-new endpoint directly
+      setGenerating(true);
+      const resp = await TestCaseService.generateNewTestCase(request);
+      setGeneratedTestCases([resp.test_case]);
+      // For generate-new, prefer Jira-fetched similar cases if available
+      if (similarCases && similarCases.length > 0) {
+        setSimilarTestCases(similarCases.map(sc => sc.test_case));
+      } else {
+        // Some backends may not return similar_cases for generate-new; default to []
+        setSimilarTestCases((resp as any).similar_cases ? (resp as any).similar_cases.map((sc: any) => sc.test_case) : []);
+      }
+
+      enqueueSnackbar(
+        `Generated new test case from ${ticket.key}: ${resp.test_case.title}`,
+        { variant: "success" }
+      );
     } catch (error) {
       console.error("Generation error:", error);
+      const message = error instanceof Error ? error.message : "Unknown error occurred";
+      enqueueSnackbar(`Error: ${message}`, { variant: "error" });
+    } finally {
+      setGenerating(false);
     }
-  };
-
-  // Add function to clear ticket when input changes
-  const handleClearTicket = () => {
-    // This should clear the ticket in useJira hook
-    // You'll need to add clearTicket method to useJira
   };
 
   const handleManualSubmit = async (data: {
@@ -230,18 +248,28 @@ const TestCaseGeneratorPage: React.FC = () => {
             variant="outlined"
             color="secondary"
             onClick={async () => {
-              // Force new generation by adding a random tag or context
-              if (pendingRequest) {
-                const newRequest = {
-                  ...pendingRequest,
-                  additional_context:
-                    (pendingRequest.additional_context || "") +
-                    " [force new generation " +
-                    Date.now() +
-                    "]",
-                };
+              if (!pendingRequest) {
                 setDuplicateDialogOpen(false);
-                await handleGenerate(newRequest);
+                return;
+              }
+              try {
+                // Close the dialog immediately for better UX and start generation in background
+                setDuplicateDialogOpen(false);
+                setGenerating(true);
+                // Call dedicated backend endpoint to generate a brand new test case
+                const resp = await TestCaseService.generateNewTestCase(pendingRequest);
+                // The backend returns a single test_case; show it and close dialog
+                setGeneratedTestCases([resp.test_case]);
+                setSimilarTestCases((resp.similar_cases || []).map(sc => sc.test_case));
+                enqueueSnackbar(
+                  `Generated new test case: ${resp.test_case.title}`,
+                  { variant: "success" }
+                );
+              } catch (e) {
+                const message = e instanceof Error ? e.message : "Unknown error";
+                enqueueSnackbar(`Error generating new test case: ${message}`, { variant: "error" });
+              } finally {
+                setGenerating(false);
               }
             }}
           >
@@ -275,8 +303,10 @@ const TestCaseGeneratorPage: React.FC = () => {
                 onSubmit={handleJiraSubmit}
                 onGenerate={handleJiraGenerate}
                 loading={jiraLoading || generating}
+                similarLoading={similarLoading}
                 error={jiraError}
                 ticket={ticket}
+                similarCases={similarCases}
               />
             </TabPanel>
 
@@ -372,6 +402,10 @@ const TestCaseGeneratorPage: React.FC = () => {
                     <TestCasePreview
                       testCases={similarTestCases}
                       variant="compact"
+                      showReviewButton={true}
+                      onReview={(id) => {
+                        if (id) navigate(`/review?highlight=${id}&focus=true`);
+                      }}
                     />
                   </CardContent>
                 </Card>
@@ -388,6 +422,29 @@ const TestCaseGeneratorPage: React.FC = () => {
                 <Typography variant="body2" color="text.secondary">
                   Fill in the form on the left to start generating test cases.
                 </Typography>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Show similar cases from Jira fetch when available and nothing generated yet */}
+          {!generating && generatedTestCases.length === 0 && similarCases && similarCases.length > 0 && (
+            <Card sx={{ mt: 2 }}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Similar Test Cases Found
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  These existing test cases might be relevant to the fetched Jira ticket.
+                </Typography>
+
+                <TestCasePreview
+                  testCases={similarCases.map((sc) => sc.test_case)}
+                  variant="compact"
+                  showReviewButton={true}
+                  onReview={(id) => {
+                    if (id) navigate(`/review?highlight=${id}&focus=true`);
+                  }}
+                />
               </CardContent>
             </Card>
           )}

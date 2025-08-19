@@ -64,8 +64,29 @@ const TestCaseReviewPage: React.FC = () => {
   const location = useLocation();
 
   // Highlighted test case state
-  const [highlightedTestCaseId, setHighlightedTestCaseId] = useState<string | null>(null);
-  const [shouldScrollToHighlighted, setShouldScrollToHighlighted] = useState(false);
+  const [highlightedTestCaseId, setHighlightedTestCaseId] = useState<
+    string | null
+  >(null);
+  const [shouldScrollToHighlighted, setShouldScrollToHighlighted] =
+    useState(false);
+
+  // Consider a test case "recent" if created within the last ~2 minutes (milliseconds)
+  const RECENT_WINDOW_MS = 120_000;
+  // Robust timestamp parsing: if no timezone suffix, assume UTC
+  const parseCreatedAtMs = (createdAt?: string | Date | null): number => {
+    if (!createdAt) return NaN;
+    if (createdAt instanceof Date) return createdAt.getTime();
+    const s = String(createdAt).trim();
+    const hasTz = /Z|[+-]\d{2}:\d{2}$/.test(s);
+    const d = new Date(hasTz ? s : `${s}Z`);
+    return d.getTime();
+  };
+
+  const isRecentlyGenerated = (createdAt?: string | Date | null): boolean => {
+    const created = parseCreatedAtMs(createdAt);
+    if (isNaN(created)) return false;
+    return Date.now() - created <= RECENT_WINDOW_MS;
+  };
 
   useEffect(() => {
     fetchTestCases();
@@ -91,16 +112,17 @@ const TestCaseReviewPage: React.FC = () => {
     setSelectedTestCase(testCase);
 
     // Ensure test steps have proper structure
-    const normalizedTestSteps = testCase.test_steps?.map((step, index) => ({
-      step_number: index + 1,
-      action: step.action || "",
-      expected_result: step.expected_result || "",
-      test_data: step.test_data || ""
-    })) || [];
+    const normalizedTestSteps =
+      testCase.test_steps?.map((step, index) => ({
+        step_number: index + 1,
+        action: step.action || "",
+        expected_result: step.expected_result || "",
+        test_data: step.test_data || "",
+      })) || [];
 
     setEditForm({
       ...testCase,
-      test_steps: normalizedTestSteps
+      test_steps: normalizedTestSteps,
     });
     setEditDialogOpen(true);
   };
@@ -130,7 +152,7 @@ const TestCaseReviewPage: React.FC = () => {
 
     if (errors.length > 0) {
       enqueueSnackbar(`Validation errors: ${errors.join(", ")}`, {
-        variant: "error"
+        variant: "error",
       });
       return;
     }
@@ -163,7 +185,10 @@ const TestCaseReviewPage: React.FC = () => {
       setTestCases(newList);
 
       // adjust current page if necessary (for example if last item on last page was deleted)
-      const totalPagesAfterDelete = Math.max(1, Math.ceil(newList.length / ITEMS_PER_PAGE));
+      const totalPagesAfterDelete = Math.max(
+        1,
+        Math.ceil(newList.length / ITEMS_PER_PAGE)
+      );
       if (currentPage > totalPagesAfterDelete) {
         setCurrentPage(totalPagesAfterDelete);
       }
@@ -185,9 +210,13 @@ const TestCaseReviewPage: React.FC = () => {
     if (!jiraId && testCase.tags && testCase.tags.length > 0) {
       // Look for JIRA/SCRUM pattern in tags (e.g., "SCRUM-22", "PROJ-123")
       for (const tag of testCase.tags) {
-        if (tag && tag.includes('-')) {
-          const parts = tag.split('-');
-          if (parts.length === 2 && parts[0].match(/^[A-Z]+$/) && parts[1].match(/^\d+$/)) {
+        if (tag && tag.includes("-")) {
+          const parts = tag.split("-");
+          if (
+            parts.length === 2 &&
+            parts[0].match(/^[A-Z]+$/) &&
+            parts[1].match(/^\d+$/)
+          ) {
             jiraId = tag;
             break;
           }
@@ -226,9 +255,9 @@ const TestCaseReviewPage: React.FC = () => {
   // Highlight+params effect (keeps same behaviour)
   useEffect(() => {
     // Check for highlight parameter
-    const highlightId = searchParams.get('highlight');
-    const shouldFocus = searchParams.get('focus') === 'true';
-    const source = searchParams.get('source');
+    const highlightId = searchParams.get("highlight");
+    const shouldFocus = searchParams.get("focus") === "true";
+    const source = searchParams.get("source");
 
     if (highlightId) {
       setHighlightedTestCaseId(highlightId);
@@ -239,8 +268,8 @@ const TestCaseReviewPage: React.FC = () => {
     }
 
     // If coming from generator with session data
-    if (source === 'generator') {
-      const pendingTestCases = sessionStorage.getItem('pendingReviewTestCases');
+    if (source === "generator") {
+      const pendingTestCases = sessionStorage.getItem("pendingReviewTestCases");
       if (pendingTestCases) {
         try {
           const testCasesFromSession = JSON.parse(pendingTestCases);
@@ -250,9 +279,9 @@ const TestCaseReviewPage: React.FC = () => {
             setShouldScrollToHighlighted(true);
           }
           // Clear session storage
-          sessionStorage.removeItem('pendingReviewTestCases');
+          sessionStorage.removeItem("pendingReviewTestCases");
         } catch (error) {
-          console.error('Failed to parse pending test cases:', error);
+          console.error("Failed to parse pending test cases:", error);
         }
       }
     }
@@ -263,7 +292,9 @@ const TestCaseReviewPage: React.FC = () => {
   useEffect(() => {
     if (!highlightedTestCaseId || testCases.length === 0) return;
 
-    const index = testCases.findIndex(tc => tc.id?.toString() === highlightedTestCaseId);
+    const index = testCases.findIndex(
+      (tc) => tc.id?.toString() === highlightedTestCaseId
+    );
     if (index >= 0) {
       const pageForHighlighted = Math.floor(index / ITEMS_PER_PAGE) + 1;
       if (pageForHighlighted !== currentPage) {
@@ -278,11 +309,13 @@ const TestCaseReviewPage: React.FC = () => {
   useEffect(() => {
     if (shouldScrollToHighlighted && highlightedTestCaseId) {
       const timer = setTimeout(() => {
-        const element = document.getElementById(`test-case-${highlightedTestCaseId}`);
+        const element = document.getElementById(
+          `test-case-${highlightedTestCaseId}`
+        );
         if (element) {
           element.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center'
+            behavior: "smooth",
+            block: "center",
           });
         }
         setShouldScrollToHighlighted(false);
@@ -298,39 +331,44 @@ const TestCaseReviewPage: React.FC = () => {
       step_number: (editForm.test_steps?.length || 0) + 1,
       action: "",
       expected_result: "",
-      test_data: ""
+      test_data: "",
     };
 
     setEditForm({
       ...editForm,
-      test_steps: [...(editForm.test_steps || []), newStep]
+      test_steps: [...(editForm.test_steps || []), newStep],
     });
   };
 
   const removeTestStep = (index: number) => {
-    const updatedSteps = editForm.test_steps?.filter((_, i) => i !== index) || [];
+    const updatedSteps =
+      editForm.test_steps?.filter((_, i) => i !== index) || [];
     // Renumber the remaining steps
     const renumberedSteps = updatedSteps.map((step, i) => ({
       ...step,
-      step_number: i + 1
+      step_number: i + 1,
     }));
 
     setEditForm({
       ...editForm,
-      test_steps: renumberedSteps
+      test_steps: renumberedSteps,
     });
   };
 
-  const updateTestStep = (index: number, field: keyof TestStep, value: string) => {
+  const updateTestStep = (
+    index: number,
+    field: keyof TestStep,
+    value: string
+  ) => {
     const updatedSteps = [...(editForm.test_steps || [])];
     updatedSteps[index] = {
       ...updatedSteps[index],
-      [field]: value
+      [field]: value,
     };
 
     setEditForm({
       ...editForm,
-      test_steps: updatedSteps
+      test_steps: updatedSteps,
     });
   };
 
@@ -397,17 +435,19 @@ const TestCaseReviewPage: React.FC = () => {
                   sx={{
                     // Add highlighting styles
                     ...(highlightedTestCaseId === testCase.id?.toString() && {
-                      border: '2px solid',
-                      borderColor: 'primary.main',
-                      boxShadow: (theme) => `0 0 20px ${theme.palette.primary.main}40`,
-                      backgroundColor: (theme) => `${theme.palette.primary.main}08`,
+                      border: "2px solid",
+                      borderColor: "primary.main",
+                      boxShadow: (theme) =>
+                        `0 0 20px ${theme.palette.primary.main}40`,
+                      backgroundColor: (theme) =>
+                        `${theme.palette.primary.main}08`,
                     }),
-                    transition: 'all 0.3s ease-in-out',
+                    transition: "all 0.3s ease-in-out",
                   }}
                 >
                   <CardContent>
-                    {/* Add a highlighted badge if this is the highlighted test case */}
-                    {highlightedTestCaseId === testCase.id?.toString() && (
+                    {/* Show Recently Generated only if created_at is recent */}
+                    {isRecentlyGenerated((testCase as any).created_at) && (
                       <Box sx={{ mb: 2 }}>
                         <Chip
                           label="Recently Generated"
@@ -565,7 +605,10 @@ const TestCaseReviewPage: React.FC = () => {
                 label="Feature Description"
                 value={editForm.feature_description || ""}
                 onChange={(e) =>
-                  setEditForm({ ...editForm, feature_description: e.target.value })
+                  setEditForm({
+                    ...editForm,
+                    feature_description: e.target.value,
+                  })
                 }
               />
             </Grid>
@@ -578,7 +621,10 @@ const TestCaseReviewPage: React.FC = () => {
                 label="Acceptance Criteria"
                 value={editForm.acceptance_criteria || ""}
                 onChange={(e) =>
-                  setEditForm({ ...editForm, acceptance_criteria: e.target.value })
+                  setEditForm({
+                    ...editForm,
+                    acceptance_criteria: e.target.value,
+                  })
                 }
               />
             </Grid>
@@ -623,7 +669,14 @@ const TestCaseReviewPage: React.FC = () => {
 
             {/* Test Steps Section */}
             <Grid item xs={12} sx={{ mt: 3 }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 2,
+                }}
+              >
                 <Typography variant="h6">Test Steps</Typography>
                 <Button
                   startIcon={<AddIcon />}
@@ -640,7 +693,14 @@ const TestCaseReviewPage: React.FC = () => {
             {editForm.test_steps?.map((step, index) => (
               <Grid item xs={12} key={index}>
                 <Card variant="outlined" sx={{ p: 2 }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 2,
+                    }}
+                  >
                     <Typography variant="subtitle1" color="primary">
                       Step {step.step_number}
                     </Typography>
@@ -662,7 +722,9 @@ const TestCaseReviewPage: React.FC = () => {
                         label="Action"
                         placeholder="Describe what the user should do..."
                         value={step.action || ""}
-                        onChange={(e) => updateTestStep(index, "action", e.target.value)}
+                        onChange={(e) =>
+                          updateTestStep(index, "action", e.target.value)
+                        }
                         multiline
                         rows={2}
                       />
@@ -674,7 +736,9 @@ const TestCaseReviewPage: React.FC = () => {
                         label="Test Data (Optional)"
                         placeholder="Any specific data needed for this step..."
                         value={step.test_data || ""}
-                        onChange={(e) => updateTestStep(index, "test_data", e.target.value)}
+                        onChange={(e) =>
+                          updateTestStep(index, "test_data", e.target.value)
+                        }
                       />
                     </Grid>
 
@@ -684,7 +748,13 @@ const TestCaseReviewPage: React.FC = () => {
                         label="Expected Result"
                         placeholder="What should happen after this action..."
                         value={step.expected_result || ""}
-                        onChange={(e) => updateTestStep(index, "expected_result", e.target.value)}
+                        onChange={(e) =>
+                          updateTestStep(
+                            index,
+                            "expected_result",
+                            e.target.value
+                          )
+                        }
                         multiline
                         rows={2}
                       />
@@ -717,7 +787,10 @@ const TestCaseReviewPage: React.FC = () => {
                 onChange={(e) =>
                   setEditForm({
                     ...editForm,
-                    tags: e.target.value.split(",").map(tag => tag.trim()).filter(tag => tag)
+                    tags: e.target.value
+                      .split(",")
+                      .map((tag) => tag.trim())
+                      .filter((tag) => tag),
                   })
                 }
                 placeholder="authentication, login, security"
@@ -727,9 +800,7 @@ const TestCaseReviewPage: React.FC = () => {
         </DialogContent>
 
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setEditDialogOpen(false)}>
-            Cancel
-          </Button>
+          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
           <Button
             onClick={handleSaveEdit}
             variant="contained"
@@ -759,7 +830,6 @@ const TestCaseReviewPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
     </Box>
   );
 };
