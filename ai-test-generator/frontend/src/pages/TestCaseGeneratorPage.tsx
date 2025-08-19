@@ -402,6 +402,10 @@ const TestCaseGeneratorPage: React.FC = () => {
                     <TestCasePreview
                       testCases={similarTestCases}
                       variant="compact"
+                      showReviewButton={true}
+                      onReview={(id) => {
+                        if (id) navigate(`/review?highlight=${id}&focus=true`);
+                      }}
                     />
                   </CardContent>
                 </Card>
@@ -434,8 +438,12 @@ const TestCaseGeneratorPage: React.FC = () => {
                 </Typography>
 
                 <TestCasePreview
-                  testCases={similarCases.map(sc => sc.test_case)}
+                  testCases={similarCases.map((sc) => sc.test_case)}
                   variant="compact"
+                  showReviewButton={true}
+                  onReview={(id) => {
+                    if (id) navigate(`/review?highlight=${id}&focus=true`);
+                  }}
                 />
               </CardContent>
             </Card>
