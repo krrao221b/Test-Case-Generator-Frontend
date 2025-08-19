@@ -18,6 +18,7 @@ import {
   Button as MuiButton,
   Typography as MuiTypography,
 } from "@mui/material";
+import DialogContentText from "@mui/material/DialogContentText";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useSnackbar } from "notistack";
 
@@ -77,6 +78,8 @@ const TestCaseGeneratorPage: React.FC = () => {
   );
   const [pendingRequest, setPendingRequest] =
     useState<GenerateTestCaseRequest | null>(null);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [jiraInput, setJiraInput] = useState(""); // Add this state
 
   // Hooks
   const {
@@ -86,6 +89,7 @@ const TestCaseGeneratorPage: React.FC = () => {
   similarLoading,
     error: jiraError,
     fetchTicket,
+    clearTicket, // <-- Import this from useJira
   } = useJira();
 
   // Set initial tab based on URL params
@@ -208,6 +212,19 @@ const TestCaseGeneratorPage: React.FC = () => {
     await handleGenerate(request);
   };
 
+  const handleJiraResetConfirmed = () => {
+    setGeneratedTestCases([]);
+    setSimilarTestCases([]);
+    sessionStorage.removeItem("generatedResults");
+    clearTicket();
+    setJiraInput(""); // <-- Clear the input here
+    setConfirmResetOpen(false);
+  };
+
+  const handleJiraReset = () => {
+    setConfirmResetOpen(true);
+  };
+
   return (
     <Box>
       {/* Duplicate Detection Dialog */}
@@ -277,6 +294,25 @@ const TestCaseGeneratorPage: React.FC = () => {
           </MuiButton>
         </DialogActions>
       </Dialog>
+
+      {/* Confirm Reset Dialog */}
+      <Dialog open={confirmResetOpen} onClose={() => setConfirmResetOpen(false)}>
+        <DialogTitle>Confirm Fetch New Ticket</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            If you fetch a new ticket, any generated test cases will be lost. Do you want to continue?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmResetOpen(false)} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleJiraResetConfirmed} color="error" variant="contained">
+            Yes, Fetch New Ticket
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Typography variant="h1" gutterBottom
       sx={{ mt: 6.5 }}>
         Generate Test Cases
@@ -307,6 +343,9 @@ const TestCaseGeneratorPage: React.FC = () => {
                 error={jiraError}
                 ticket={ticket}
                 similarCases={similarCases}
+                input={jiraInput}
+                setInput={setJiraInput}
+                onReset={handleJiraReset}
               />
             </TabPanel>
 
