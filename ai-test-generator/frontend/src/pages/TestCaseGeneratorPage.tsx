@@ -166,9 +166,28 @@ const TestCaseGeneratorPage: React.FC = () => {
         tags: [ticket.key],
       };
 
-      await handleGenerate(request);
+      // For Jira flow, call the dedicated generate-new endpoint directly
+      setGenerating(true);
+      const resp = await TestCaseService.generateNewTestCase(request);
+      setGeneratedTestCases([resp.test_case]);
+      // For generate-new, prefer Jira-fetched similar cases if available
+      if (similarCases && similarCases.length > 0) {
+        setSimilarTestCases(similarCases.map(sc => sc.test_case));
+      } else {
+        // Some backends may not return similar_cases for generate-new; default to []
+        setSimilarTestCases((resp as any).similar_cases ? (resp as any).similar_cases.map((sc: any) => sc.test_case) : []);
+      }
+
+      enqueueSnackbar(
+        `Generated new test case from ${ticket.key}: ${resp.test_case.title}`,
+        { variant: "success" }
+      );
     } catch (error) {
       console.error("Generation error:", error);
+      const message = error instanceof Error ? error.message : "Unknown error occurred";
+      enqueueSnackbar(`Error: ${message}`, { variant: "error" });
+    } finally {
+      setGenerating(false);
     }
   };
 
