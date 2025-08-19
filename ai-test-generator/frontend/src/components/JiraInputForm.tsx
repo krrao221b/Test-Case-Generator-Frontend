@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Box,
   TextField,
@@ -19,12 +19,15 @@ import type { JiraTicket, SimilarTestCase } from "../types";
 
 interface JiraInputFormProps {
   onSubmit: (ticketIdOrUrl: string) => Promise<void>;
-  onGenerate?: () => Promise<void>; // New prop for generate action
+  onGenerate?: () => Promise<void>;
   loading: boolean;
   similarLoading?: boolean;
   error: string | null;
   ticket: JiraTicket | null;
   similarCases?: SimilarTestCase[];
+  onReset?: () => void; // <-- Add this line
+  input: string;
+  setInput: (val: string) => void;
 }
 
 const JiraInputForm: React.FC<JiraInputFormProps> = ({
@@ -35,9 +38,10 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
   error,
   ticket,
   similarCases = [],
+  onReset,
+  input,
+  setInput,
 }) => {
-  const [input, setInput] = useState<string>("");
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -52,8 +56,6 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
-    // Clear the ticket when user changes input (forces re-fetch)
-    // This will be handled by parent component
   };
 
   const getButtonText = () => {
@@ -209,8 +211,8 @@ const JiraInputForm: React.FC<JiraInputFormProps> = ({
           fullWidth
           sx={{ mt: 1 }}
           onClick={() => {
-            setInput("");
-            // This will trigger parent to clear ticket
+            if (typeof onReset === "function") onReset();
+            // Remove setInput("") from here!
           }}
         >
           Fetch Different Ticket
