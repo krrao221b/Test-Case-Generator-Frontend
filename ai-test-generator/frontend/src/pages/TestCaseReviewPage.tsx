@@ -8,6 +8,7 @@ import {
   Button,
   Chip,
   Alert,
+  Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -19,6 +20,7 @@ import {
   MenuItem,
   CircularProgress,
   Pagination,
+  InputAdornment,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -26,6 +28,8 @@ import {
   CloudUpload as PushIcon,
   Add as AddIcon,
   Remove as RemoveIcon,
+  Link as LinkIcon,
+  HelpOutline as HelpIcon,
 } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
 import { useSearchParams, useLocation } from "react-router-dom";
@@ -158,8 +162,25 @@ const TestCaseReviewPage: React.FC = () => {
       return;
     }
 
+    // Normalize fields (e.g., Jira key)
+    const normalizedEditForm: Partial<TestCase> = {
+      ...editForm,
+      jira_issue_key: editForm.jira_issue_key
+        ? editForm.jira_issue_key.trim().toUpperCase()
+        : editForm.jira_issue_key,
+    };
+
+    // Basic Jira key validation if provided
+    if (normalizedEditForm.jira_issue_key) {
+      const jiraFormat = /^[A-Z][A-Z0-9]+-\d+$/; // e.g., PROJ-123
+      if (!jiraFormat.test(normalizedEditForm.jira_issue_key)) {
+        enqueueSnackbar("Invalid Jira Issue Key format (expected ABC-123).", { variant: "warning" });
+        return;
+      }
+    }
+
     try {
-      const updatedTestCase = await TestCaseService.saveTestCase(editForm);
+      const updatedTestCase = await TestCaseService.saveTestCase(normalizedEditForm);
       setTestCases(
         testCases.map((tc) => (tc.id === editForm.id ? updatedTestCase : tc))
       );
@@ -225,11 +246,27 @@ const TestCaseReviewPage: React.FC = () => {
       }
     }
 
-    if (!jiraId) {
+    const normalizedJiraId = (jiraId || "").trim().toUpperCase();
+
+    if (!normalizedJiraId) {
       enqueueSnackbar(
-        "No JIRA issue key found. Please ensure the test case is linked to a JIRA ticket.",
+        "No JIRA issue key found. Please update the test case to be linked to a JIRA ticket.",
         { variant: "warning" }
       );
+      return;
+    }
+
+    // Validate Jira key format
+    const jiraFormat = /^[A-Z][A-Z0-9]+-\d+$/;
+    if (!jiraFormat.test(normalizedJiraId)) {
+      enqueueSnackbar("Invalid Jira Issue Key format (expected ABC-123).", { variant: "warning" });
+      return;
+    }
+
+    // Validate test case content for Zephyr
+    const validationErrors = ZephyrService.validateTestCaseForZephyr(testCase, normalizedJiraId);
+    if (validationErrors.length > 0) {
+      enqueueSnackbar(`Cannot push: ${validationErrors.join("; ")}`, { variant: "error" });
       return;
     }
 
@@ -237,13 +274,15 @@ const TestCaseReviewPage: React.FC = () => {
       // mark this test case as pushing so the UI can show a loader
       setPushingId(testCase.id?.toString() || null);
       // Format the request according to backend API
-      const request = ZephyrService.formatTestCaseForZephyr(testCase, jiraId);
+      const request = ZephyrService.formatTestCaseForZephyr(testCase, normalizedJiraId);
 
+      //Check for correct format of request
+      console.log("Formatted request for Zephyr:", request);
       // Push to Zephyr
       const response = await ZephyrService.pushTestCase(request);
 
       enqueueSnackbar(
-        `Test case pushed to Zephyr successfully! Test case key: ${response.testcase_key} (linked to ${jiraId})`,
+  `Test case pushed to Zephyr successfully! Test case key: ${response.testcase_key} (linked to ${normalizedJiraId})`,
         { variant: "success" }
       );
     } catch (error) {
@@ -596,6 +635,54 @@ const TestCaseReviewPage: React.FC = () => {
                   setEditForm({ ...editForm, title: e.target.value })
                 }
               />
+            </Grid>
+
+            {/* Jira visibility tip */}
+            <Grid item xs={12}>
+              <Alert severity="info" sx={{ mb: 1 }}>
+                Optional: Link a Jira Issue Key (e.g., PROJ-123) to enable pushing this test case to Zephyr.
+              </Alert>
+            </Grid>
+
+            {/* Prominent Jira Issue Key field */}
+            <Grid item xs={12} md={6}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 1,
+                  border: (theme) => `1px solid ${theme.palette.divider}`,
+                  borderLeft: (theme) => `4px solid ${theme.palette.primary.main}`,
+                  background: (theme) =>
+                    theme.palette.mode === 'dark'
+                      ? 'rgba(239,3,4,0.08)'
+                      : 'rgba(25,118,210,0.08)',
+                }}
+              >
+                <TextField
+                  fullWidth
+                  label="Jira Issue Key (optional)"
+                  placeholder="PROJ-123"
+                  value={editForm.jira_issue_key || ""}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, jira_issue_key: e.target.value })
+                  }
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LinkIcon color="primary" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Tooltip title="Format: ABC-123. Not required, but needed for Zephyr push.">
+                          <HelpIcon fontSize="small" />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  helperText="Format: ABC-123 (e.g., SCRUM-42)."
+                />
+              </Box>
             </Grid>
 
             <Grid item xs={12}>
