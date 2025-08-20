@@ -172,6 +172,48 @@ const TestCaseReviewPage: React.FC = () => {
     }
   };
 
+  // Save current edits as a brand-new test case (no overwrite)
+  const handleSaveAsNew = async () => {
+    if (!selectedTestCase?.id) return;
+    // Validate minimal requirements
+    const errors: string[] = [];
+    if (!editForm.title?.trim()) {
+      errors.push("Title is required");
+    }
+    if (!editForm.test_steps || editForm.test_steps.length === 0) {
+      errors.push("At least one test step is required");
+    } else {
+      editForm.test_steps.forEach((step, index) => {
+        if (!step.action?.trim()) {
+          errors.push(`Step ${index + 1}: Action is required`);
+        }
+        if (!step.expected_result?.trim()) {
+          errors.push(`Step ${index + 1}: Expected result is required`);
+        }
+      });
+    }
+    if (errors.length > 0) {
+      enqueueSnackbar(`Validation errors: ${errors.join(", ")}`, { variant: "error" });
+      return;
+    }
+
+    try {
+      const newTestCase = await TestCaseService.saveAsNew(
+        selectedTestCase.id.toString(),
+        editForm
+      );
+      // Add to top and highlight
+      setTestCases([newTestCase, ...testCases]);
+      setHighlightedTestCaseId(newTestCase.id?.toString() || null);
+      setShouldScrollToHighlighted(true);
+      setEditDialogOpen(false);
+      enqueueSnackbar("Saved as a new test case", { variant: "success" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save as new";
+      enqueueSnackbar(`Error: ${message}`, { variant: "error" });
+    }
+  };
+
   const handleDelete = (testCase: TestCase) => {
     setSelectedTestCase(testCase);
     setDeleteDialogOpen(true);
@@ -815,6 +857,13 @@ const TestCaseReviewPage: React.FC = () => {
 
         <DialogActions sx={{ p: 3 }}>
           <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleSaveAsNew}
+            variant="outlined"
+            disabled={!editForm.title?.trim() || !editForm.test_steps?.length}
+          >
+            Save as New
+          </Button>
           <Button
             onClick={handleSaveEdit}
             variant="contained"
