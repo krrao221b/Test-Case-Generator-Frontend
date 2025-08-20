@@ -8,6 +8,7 @@ import {
   Button,
   Chip,
   Alert,
+  Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -19,6 +20,10 @@ import {
   MenuItem,
   CircularProgress,
   Pagination,
+  InputAdornment,
+  IconButton,
+  Divider,
+  Stack,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -26,6 +31,10 @@ import {
   CloudUpload as PushIcon,
   Add as AddIcon,
   Remove as RemoveIcon,
+  Link as LinkIcon,
+  HelpOutline as HelpIcon,
+  CheckCircle as CheckCircleIcon,
+  ErrorOutline as ErrorOutlineIcon,
 } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
 import { useSearchParams, useLocation } from "react-router-dom";
@@ -34,7 +43,7 @@ import { useSearchParams, useLocation } from "react-router-dom";
 import TestCasePreview from "../components/TestCasePreview";
 
 // Services
-import { TestCaseService, ZephyrService } from "../services";
+import { TestCaseService, ZephyrService, JiraService } from "../services";
 
 // Types
 import type { TestCase, TestStep } from "../types";
@@ -59,6 +68,11 @@ const TestCaseReviewPage: React.FC = () => {
   // Form state for editing
   const [editForm, setEditForm] = useState<Partial<TestCase>>({});
   const [pushingId, setPushingId] = useState<string | null>(null);
+  // Jira key validation state
+  const [jiraKeyStatus, setJiraKeyStatus] = useState<
+    'idle' | 'checking' | 'valid' | 'invalid'
+  >('idle');
+  const [jiraKeyMessage, setJiraKeyMessage] = useState<string>("");
 
   // Search params and location
   const [searchParams] = useSearchParams();
@@ -125,6 +139,9 @@ const TestCaseReviewPage: React.FC = () => {
       ...testCase,
       test_steps: normalizedTestSteps,
     });
+  // reset jira validation for fresh edit
+  setJiraKeyStatus('idle');
+  setJiraKeyMessage('');
     setEditDialogOpen(true);
   };
 
@@ -133,6 +150,11 @@ const TestCaseReviewPage: React.FC = () => {
 
     // Validate test steps
     const errors: string[] = [];
+    // If Jira key is provided but not validated as 'valid', block save
+    if ((editForm.jira_issue_key || '').trim() && jiraKeyStatus !== 'valid') {
+      enqueueSnackbar("Please validate the Jira Issue Key before saving.", { variant: "warning" });
+      return;
+    }
 
     if (!editForm.title?.trim()) {
       errors.push("Title is required");
@@ -158,8 +180,25 @@ const TestCaseReviewPage: React.FC = () => {
       return;
     }
 
+    // Normalize fields (e.g., Jira key)
+    const normalizedEditForm: Partial<TestCase> = {
+      ...editForm,
+      jira_issue_key: editForm.jira_issue_key
+        ? editForm.jira_issue_key.trim().toUpperCase()
+        : editForm.jira_issue_key,
+    };
+
+    // Basic Jira key validation if provided
+    if (normalizedEditForm.jira_issue_key) {
+      const jiraFormat = /^[A-Z][A-Z0-9]+-\d+$/; // e.g., PROJ-123
+      if (!jiraFormat.test(normalizedEditForm.jira_issue_key)) {
+        enqueueSnackbar("Invalid Jira Issue Key format (expected ABC-123).", { variant: "warning" });
+        return;
+      }
+    }
+
     try {
-      const updatedTestCase = await TestCaseService.saveTestCase(editForm);
+      const updatedTestCase = await TestCaseService.saveTestCase(normalizedEditForm);
       setTestCases(
         testCases.map((tc) => (tc.id === editForm.id ? updatedTestCase : tc))
       );
@@ -267,11 +306,27 @@ const TestCaseReviewPage: React.FC = () => {
       }
     }
 
-    if (!jiraId) {
+    const normalizedJiraId = (jiraId || "").trim().toUpperCase();
+
+    if (!normalizedJiraId) {
       enqueueSnackbar(
-        "No JIRA issue key found. Please ensure the test case is linked to a JIRA ticket.",
+        "No JIRA issue key found. Please update the test case to be linked to a JIRA ticket.",
         { variant: "warning" }
       );
+      return;
+    }
+
+    // Validate Jira key format
+    const jiraFormat = /^[A-Z][A-Z0-9]+-\d+$/;
+    if (!jiraFormat.test(normalizedJiraId)) {
+      enqueueSnackbar("Invalid Jira Issue Key format (expected ABC-123).", { variant: "warning" });
+      return;
+    }
+
+    // Validate test case content for Zephyr
+    const validationErrors = ZephyrService.validateTestCaseForZephyr(testCase, normalizedJiraId);
+    if (validationErrors.length > 0) {
+      enqueueSnackbar(`Cannot push: ${validationErrors.join("; ")}`, { variant: "error" });
       return;
     }
 
@@ -279,13 +334,15 @@ const TestCaseReviewPage: React.FC = () => {
       // mark this test case as pushing so the UI can show a loader
       setPushingId(testCase.id?.toString() || null);
       // Format the request according to backend API
-      const request = ZephyrService.formatTestCaseForZephyr(testCase, jiraId);
+      const request = ZephyrService.formatTestCaseForZephyr(testCase, normalizedJiraId);
 
+      //Check for correct format of request
+      console.log("Formatted request for Zephyr:", request);
       // Push to Zephyr
       const response = await ZephyrService.pushTestCase(request);
 
       enqueueSnackbar(
-        `Test case pushed to Zephyr successfully! Test case key: ${response.testcase_key} (linked to ${jiraId})`,
+  `Test case pushed to Zephyr successfully! Test case key: ${response.testcase_key} (linked to ${normalizedJiraId})`,
         { variant: "success" }
       );
     } catch (error) {
@@ -622,27 +679,143 @@ const TestCaseReviewPage: React.FC = () => {
         <DialogTitle>Edit Test Case</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
+            {/* Jira tip and key go first for visibility */}
+            <Grid item xs={12}>
+              <Alert severity="info" sx={{ mb: 1 }}>
+                Optional: Link a Jira Issue Key (e.g., PROJ-123) to enable pushing this test case to Zephyr.
+              </Alert>
+            </Grid>
+
+            {/* Prominent Jira Issue Key field */}
+            <Grid item xs={12} md={6}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 1,
+                  border: (theme) => `1px solid ${theme.palette.divider}`,
+                  borderLeft: (theme) => `4px solid ${
+                    jiraKeyStatus === 'valid'
+                      ? theme.palette.success.main
+                      : jiraKeyStatus === 'invalid'
+                      ? theme.palette.error.main
+                      : theme.palette.primary.main
+                  }`,
+                  // keep background clean per best practices; use field states instead
+                  backgroundColor: 'transparent',
+                }}
+              >
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Jira Issue Key (optional)"
+                  placeholder="PROJ-123"
+                  value={editForm.jira_issue_key || ""}
+                  onChange={(e) =>
+                    {
+                      setEditForm({ ...editForm, jira_issue_key: e.target.value });
+                      setJiraKeyStatus('idle');
+                      setJiraKeyMessage('');
+                    }
+                  }
+                  error={jiraKeyStatus === 'invalid'}
+                  color={jiraKeyStatus === 'valid' ? 'success' : 'primary'}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title={jiraKeyStatus === 'checking' ? 'Checking…' : 'Validate Jira key'}>
+                          <span>
+                            <IconButton
+                              aria-label="validate jira key"
+                              size="small"
+                              color={jiraKeyStatus === 'invalid' ? 'error' : jiraKeyStatus === 'valid' ? 'success' : 'primary'}
+                              disabled={jiraKeyStatus === 'checking' || !(editForm.jira_issue_key || '').trim()}
+                              onClick={async () => {
+                                const raw = (editForm.jira_issue_key || '').trim().toUpperCase();
+                                if (!raw) return;
+                                // quick format check
+                                const fmt = /^[A-Z][A-Z0-9]+-\d+$/;
+                                if (!fmt.test(raw)) {
+                                  setJiraKeyStatus('invalid');
+                                  setJiraKeyMessage('Invalid format (expected ABC-123).');
+                                  return;
+                                }
+                                setJiraKeyStatus('checking');
+                                setJiraKeyMessage('');
+                                try {
+                                  // call backend without similar cases
+                                  await JiraService.getTicket(raw, { includeSimilar: false });
+                                  setJiraKeyStatus('valid');
+                                  setJiraKeyMessage('Ticket exists');
+                                } catch (err: any) {
+                                  const status = err?.status ?? err?.originalError?.status;
+                                  if (status === 404) {
+                                    setJiraKeyStatus('invalid');
+                                    setJiraKeyMessage('Ticket not found');
+                                  } else {
+                                    setJiraKeyStatus('invalid');
+                                    setJiraKeyMessage(err?.message || 'Failed to verify');
+                                  }
+                                }
+                              }}
+                            >
+                              {jiraKeyStatus === 'valid' ? (
+                                <CheckCircleIcon fontSize="small" />
+                              ) : jiraKeyStatus === 'invalid' ? (
+                                <ErrorOutlineIcon fontSize="small" />
+                              ) : (
+                                <LinkIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Tooltip title="Format: ABC-123. Not required, but needed for Zephyr push.">
+                          <HelpIcon fontSize="small" />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  helperText={
+                    jiraKeyStatus === 'invalid'
+                      ? (jiraKeyMessage || 'Invalid Jira issue key.')
+                      : jiraKeyStatus === 'valid'
+                        ? 'Looks good. This ticket exists.'
+                        : 'Format: ABC-123 (e.g., SCRUM-42).'
+                  }
+                />
+              </Box>
+            </Grid>
+
             {/* Basic Information */}
             <Grid item xs={12}>
               <Typography variant="h6" gutterBottom>
                 Basic Information
               </Typography>
+              <Divider />
             </Grid>
 
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
+                autoFocus
+                required
                 label="Title"
                 value={editForm.title || ""}
                 onChange={(e) =>
                   setEditForm({ ...editForm, title: e.target.value })
                 }
+                helperText={!editForm.title?.trim() ? "Title is required" : " "}
               />
             </Grid>
 
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
                 multiline
                 rows={3}
                 label="Description"
@@ -650,12 +823,14 @@ const TestCaseReviewPage: React.FC = () => {
                 onChange={(e) =>
                   setEditForm({ ...editForm, description: e.target.value })
                 }
+                placeholder="High-level description of this test case"
               />
             </Grid>
 
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
                 multiline
                 rows={2}
                 label="Feature Description"
@@ -666,12 +841,14 @@ const TestCaseReviewPage: React.FC = () => {
                     feature_description: e.target.value,
                   })
                 }
+                placeholder="What part of the product this test covers"
               />
             </Grid>
 
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
                 multiline
                 rows={3}
                 label="Acceptance Criteria"
@@ -682,13 +859,15 @@ const TestCaseReviewPage: React.FC = () => {
                     acceptance_criteria: e.target.value,
                   })
                 }
+                placeholder="List the criteria that must be met for pass"
               />
             </Grid>
 
             <Grid item xs={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth size="small">
                 <InputLabel>Priority</InputLabel>
                 <Select
+                  size="small"
                   value={editForm.priority || "medium"}
                   label="Priority"
                   onChange={(e) =>
@@ -707,9 +886,10 @@ const TestCaseReviewPage: React.FC = () => {
             </Grid>
 
             <Grid item xs={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth size="small">
                 <InputLabel>Status</InputLabel>
                 <Select
+                  size="small"
                   value={editForm.status || "draft"}
                   label="Status"
                   onChange={(e) =>
@@ -725,24 +905,13 @@ const TestCaseReviewPage: React.FC = () => {
 
             {/* Test Steps Section */}
             <Grid item xs={12} sx={{ mt: 3 }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
                 <Typography variant="h6">Test Steps</Typography>
-                <Button
-                  startIcon={<AddIcon />}
-                  variant="outlined"
-                  size="small"
-                  onClick={addTestStep}
-                >
+                <Button startIcon={<AddIcon />} variant="outlined" size="small" onClick={addTestStep}>
                   Add Step
                 </Button>
-              </Box>
+              </Stack>
+              <Divider />
             </Grid>
 
             {/* Test Steps List */}
@@ -824,6 +993,7 @@ const TestCaseReviewPage: React.FC = () => {
             <Grid item xs={12} sx={{ mt: 2 }}>
               <TextField
                 fullWidth
+                size="small"
                 multiline
                 rows={2}
                 label="Overall Expected Result"
@@ -831,6 +1001,7 @@ const TestCaseReviewPage: React.FC = () => {
                 onChange={(e) =>
                   setEditForm({ ...editForm, expected_result: e.target.value })
                 }
+                placeholder="What should be true at the end of this test"
               />
             </Grid>
 
@@ -838,6 +1009,7 @@ const TestCaseReviewPage: React.FC = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
                 label="Tags (comma-separated)"
                 value={editForm.tags?.join(", ") || ""}
                 onChange={(e) =>
@@ -850,6 +1022,7 @@ const TestCaseReviewPage: React.FC = () => {
                   })
                 }
                 placeholder="authentication, login, security"
+                helperText="Use commas to separate tags"
               />
             </Grid>
           </Grid>
@@ -867,7 +1040,11 @@ const TestCaseReviewPage: React.FC = () => {
           <Button
             onClick={handleSaveEdit}
             variant="contained"
-            disabled={!editForm.title?.trim() || !editForm.test_steps?.length}
+            disabled={
+              !editForm.title?.trim() ||
+              !editForm.test_steps?.length ||
+              (((editForm.jira_issue_key || '').trim().length > 0) && jiraKeyStatus !== 'valid')
+            }
           >
             Save Changes
           </Button>
