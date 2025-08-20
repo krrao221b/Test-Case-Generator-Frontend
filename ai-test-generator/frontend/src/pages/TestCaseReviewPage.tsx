@@ -22,6 +22,8 @@ import {
   Pagination,
   InputAdornment,
   IconButton,
+  Divider,
+  Stack,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -635,25 +637,7 @@ const TestCaseReviewPage: React.FC = () => {
         <DialogTitle>Edit Test Case</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            {/* Basic Information */}
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom>
-                Basic Information
-              </Typography>
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Title"
-                value={editForm.title || ""}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, title: e.target.value })
-                }
-              />
-            </Grid>
-
-            {/* Jira visibility tip */}
+            {/* Jira tip and key go first for visibility */}
             <Grid item xs={12}>
               <Alert severity="info" sx={{ mb: 1 }}>
                 Optional: Link a Jira Issue Key (e.g., PROJ-123) to enable pushing this test case to Zephyr.
@@ -674,25 +658,13 @@ const TestCaseReviewPage: React.FC = () => {
                       ? theme.palette.error.main
                       : theme.palette.primary.main
                   }`,
-                  background: (theme) => {
-                    if (jiraKeyStatus === 'valid') {
-                      return theme.palette.mode === 'dark'
-                        ? 'rgba(46,204,113,0.12)'
-                        : 'rgba(46,204,113,0.08)';
-                    }
-                    if (jiraKeyStatus === 'invalid') {
-                      return theme.palette.mode === 'dark'
-                        ? 'rgba(239,3,4,0.12)'
-                        : 'rgba(239,3,4,0.08)';
-                    }
-                    return theme.palette.mode === 'dark'
-                      ? 'rgba(239,3,4,0.08)'
-                      : 'rgba(25,118,210,0.08)';
-                  },
+                  // keep background clean per best practices; use field states instead
+                  backgroundColor: 'transparent',
                 }}
               >
                 <TextField
                   fullWidth
+                  size="small"
                   label="Jira Issue Key (optional)"
                   placeholder="PROJ-123"
                   value={editForm.jira_issue_key || ""}
@@ -703,6 +675,8 @@ const TestCaseReviewPage: React.FC = () => {
                       setJiraKeyMessage('');
                     }
                   }
+                  error={jiraKeyStatus === 'invalid'}
+                  color={jiraKeyStatus === 'valid' ? 'success' : 'primary'}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -762,27 +736,44 @@ const TestCaseReviewPage: React.FC = () => {
                       </InputAdornment>
                     ),
                   }}
-                  helperText="Format: ABC-123 (e.g., SCRUM-42)."
+                  helperText={
+                    jiraKeyStatus === 'invalid'
+                      ? (jiraKeyMessage || 'Invalid Jira issue key.')
+                      : jiraKeyStatus === 'valid'
+                        ? 'Looks good. This ticket exists.'
+                        : 'Format: ABC-123 (e.g., SCRUM-42).'
+                  }
                 />
-                {jiraKeyStatus !== 'idle' && (
-                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {jiraKeyStatus === 'checking' && (
-                      <CircularProgress size={16} />
-                    )}
-                    {jiraKeyStatus === 'valid' && (
-                      <Chip size="small" color="success" label="Valid Jira issue" />
-                    )}
-                    {jiraKeyStatus === 'invalid' && (
-                      <Chip size="small" color="error" label={jiraKeyMessage || 'Invalid Jira issue'} />
-                    )}
-                  </Box>
-                )}
               </Box>
+            </Grid>
+
+            {/* Basic Information */}
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>
+                Basic Information
+              </Typography>
+              <Divider />
             </Grid>
 
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
+                autoFocus
+                required
+                label="Title"
+                value={editForm.title || ""}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, title: e.target.value })
+                }
+                helperText={!editForm.title?.trim() ? "Title is required" : " "}
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                size="small"
                 multiline
                 rows={3}
                 label="Description"
@@ -790,12 +781,14 @@ const TestCaseReviewPage: React.FC = () => {
                 onChange={(e) =>
                   setEditForm({ ...editForm, description: e.target.value })
                 }
+                placeholder="High-level description of this test case"
               />
             </Grid>
 
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
                 multiline
                 rows={2}
                 label="Feature Description"
@@ -806,12 +799,14 @@ const TestCaseReviewPage: React.FC = () => {
                     feature_description: e.target.value,
                   })
                 }
+                placeholder="What part of the product this test covers"
               />
             </Grid>
 
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
                 multiline
                 rows={3}
                 label="Acceptance Criteria"
@@ -822,13 +817,15 @@ const TestCaseReviewPage: React.FC = () => {
                     acceptance_criteria: e.target.value,
                   })
                 }
+                placeholder="List the criteria that must be met for pass"
               />
             </Grid>
 
             <Grid item xs={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth size="small">
                 <InputLabel>Priority</InputLabel>
                 <Select
+                  size="small"
                   value={editForm.priority || "medium"}
                   label="Priority"
                   onChange={(e) =>
@@ -847,9 +844,10 @@ const TestCaseReviewPage: React.FC = () => {
             </Grid>
 
             <Grid item xs={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth size="small">
                 <InputLabel>Status</InputLabel>
                 <Select
+                  size="small"
                   value={editForm.status || "draft"}
                   label="Status"
                   onChange={(e) =>
@@ -865,24 +863,13 @@ const TestCaseReviewPage: React.FC = () => {
 
             {/* Test Steps Section */}
             <Grid item xs={12} sx={{ mt: 3 }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
                 <Typography variant="h6">Test Steps</Typography>
-                <Button
-                  startIcon={<AddIcon />}
-                  variant="outlined"
-                  size="small"
-                  onClick={addTestStep}
-                >
+                <Button startIcon={<AddIcon />} variant="outlined" size="small" onClick={addTestStep}>
                   Add Step
                 </Button>
-              </Box>
+              </Stack>
+              <Divider />
             </Grid>
 
             {/* Test Steps List */}
@@ -964,6 +951,7 @@ const TestCaseReviewPage: React.FC = () => {
             <Grid item xs={12} sx={{ mt: 2 }}>
               <TextField
                 fullWidth
+                size="small"
                 multiline
                 rows={2}
                 label="Overall Expected Result"
@@ -971,6 +959,7 @@ const TestCaseReviewPage: React.FC = () => {
                 onChange={(e) =>
                   setEditForm({ ...editForm, expected_result: e.target.value })
                 }
+                placeholder="What should be true at the end of this test"
               />
             </Grid>
 
@@ -978,6 +967,7 @@ const TestCaseReviewPage: React.FC = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
                 label="Tags (comma-separated)"
                 value={editForm.tags?.join(", ") || ""}
                 onChange={(e) =>
@@ -990,6 +980,7 @@ const TestCaseReviewPage: React.FC = () => {
                   })
                 }
                 placeholder="authentication, login, security"
+                helperText="Use commas to separate tags"
               />
             </Grid>
           </Grid>
