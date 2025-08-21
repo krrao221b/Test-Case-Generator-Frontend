@@ -165,6 +165,11 @@ export class TestCaseService {
     try {
       const endpoint = `${API_ENDPOINTS.TEST_CASE_BY_ID(id)}/save-as-new`;
       // Construct backend-specific request payload
+      const allowedStatuses = new Set(["draft", "active", "deprecated"]);
+      const normalizedStatus = testCase.status
+        ? String(testCase.status).trim().toLowerCase()
+        : undefined;
+
       const payload = {
         base_test_case_id: Number(id),
         title: testCase.title ?? undefined,
@@ -173,6 +178,9 @@ export class TestCaseService {
         acceptance_criteria: testCase.acceptance_criteria ?? undefined,
         priority: testCase.priority
           ? (String(testCase.priority).toLowerCase() as TestCase["priority"])
+          : undefined,
+        status: normalizedStatus && allowedStatuses.has(normalizedStatus)
+          ? normalizedStatus
           : undefined,
         tags: testCase.tags ?? undefined,
         preconditions: testCase.preconditions ?? undefined,
