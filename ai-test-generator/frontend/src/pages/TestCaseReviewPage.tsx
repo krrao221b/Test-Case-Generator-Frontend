@@ -67,6 +67,9 @@ const TestCaseReviewPage: React.FC = () => {
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  // Saving state to block actions/exit while awaiting response
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [savingAction, setSavingAction] = useState<"edit" | "new" | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -219,6 +222,8 @@ const TestCaseReviewPage: React.FC = () => {
     }
 
     try {
+      setIsSaving(true);
+      setSavingAction("edit");
       const updatedTestCase = await TestCaseService.saveTestCase(normalizedEditForm);
       setTestCases(
         testCases.map((tc) => (tc.id === editForm.id ? updatedTestCase : tc))
@@ -229,6 +234,9 @@ const TestCaseReviewPage: React.FC = () => {
       const message =
         error instanceof Error ? error.message : "Failed to update test case";
       enqueueSnackbar(`Error: ${message}`, { variant: "error" });
+    } finally {
+      setIsSaving(false);
+      setSavingAction(null);
     }
   };
 
@@ -258,6 +266,8 @@ const TestCaseReviewPage: React.FC = () => {
     }
 
     try {
+      setIsSaving(true);
+      setSavingAction("new");
       const newTestCase = await TestCaseService.saveAsNew(
         selectedTestCase.id.toString(),
         editForm
@@ -271,6 +281,9 @@ const TestCaseReviewPage: React.FC = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save as new";
       enqueueSnackbar(`Error: ${message}`, { variant: "error" });
+    } finally {
+      setIsSaving(false);
+      setSavingAction(null);
     }
   };
 
@@ -674,12 +687,21 @@ const TestCaseReviewPage: React.FC = () => {
       {/* Edit Dialog (unchanged) */}
       <Dialog
         open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
+        onClose={(e, reason) => {
+          // Block closing via backdrop/escape while saving
+          if (isSaving && (reason === "backdropClick" || reason === "escapeKeyDown")) {
+            return;
+          }
+          setEditDialogOpen(false);
+        }}
         maxWidth="lg"
         fullWidth
+        disableEscapeKeyDown={isSaving}
       >
         <DialogTitle>Edit Test Case</DialogTitle>
         <DialogContent>
+          {/* Disable all inputs while saving */}
+          <Box component="fieldset" disabled={isSaving} sx={{ border: 0, p: 0, m: 0 }}>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             {/* Jira tip and key go first for visibility */}
             <Grid item xs={12}>
@@ -1058,16 +1080,22 @@ const TestCaseReviewPage: React.FC = () => {
               />
             </Grid>
           </Grid>
+          </Box>
         </DialogContent>
 
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setEditDialogOpen(false)} disabled={isSaving}>Cancel</Button>
           <Button
             onClick={handleSaveAsNew}
             variant="outlined"
-            disabled={!editForm.title?.trim() || !editForm.test_steps?.length}
+            disabled={
+              isSaving ||
+              !editForm.title?.trim() ||
+              !editForm.test_steps?.length
+            }
+            startIcon={isSaving && savingAction === "new" ? <CircularProgress size={18} /> : undefined}
           >
-            Save as New
+            {isSaving && savingAction === "new" ? "Saving…" : "Save as New"}
           </Button>
           <Tooltip 
             title={
@@ -1081,13 +1109,15 @@ const TestCaseReviewPage: React.FC = () => {
                 onClick={handleSaveEdit}
                 variant="contained"
                 disabled={
+                  isSaving ||
                   !editForm.title?.trim() ||
                   !editForm.test_steps?.length ||
                   (((editForm.jira_issue_key || '').trim().length > 0) && jiraKeyStatus !== 'valid') ||
                   areRestrictedFieldsModified()
                 }
+                startIcon={isSaving && savingAction === "edit" ? <CircularProgress size={18} color="inherit" /> : undefined}
               >
-                Save Changes
+                {isSaving && savingAction === "edit" ? "Saving…" : "Save Changes"}
               </Button>
             </span>
           </Tooltip>
