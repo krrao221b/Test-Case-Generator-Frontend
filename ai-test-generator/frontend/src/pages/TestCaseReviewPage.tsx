@@ -44,6 +44,7 @@ import TestCasePreview from "../components/TestCasePreview";
 
 // Services
 import { TestCaseService, ZephyrService, JiraService } from "../services";
+import { useZephyr } from "../hooks/useZephyr";
 
 // Types
 import type { TestCase, TestStep } from "../types";
@@ -52,6 +53,11 @@ const ITEMS_PER_PAGE = 5;
 
 const TestCaseReviewPage: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
+  const {
+    loading: zephyrLoading,
+    pushTestCaseWithUI,
+    validateTestCase: validateTestCaseForZephyr,
+  } = useZephyr();
 
   // State
   const [testCases, setTestCases] = useState<TestCase[]>([]);
@@ -70,8 +76,8 @@ const TestCaseReviewPage: React.FC = () => {
   const [pushingId, setPushingId] = useState<string | null>(null);
   // Jira key validation state
   const [jiraKeyStatus, setJiraKeyStatus] = useState<
-    'idle' | 'checking' | 'valid' | 'invalid'
-  >('idle');
+    "idle" | "checking" | "valid" | "invalid"
+  >("idle");
   const [jiraKeyMessage, setJiraKeyMessage] = useState<string>("");
 
   // Helper function to check if restricted fields (Description, Feature Description, Acceptance Criteria) are modified
@@ -150,9 +156,9 @@ const TestCaseReviewPage: React.FC = () => {
       ...testCase,
       test_steps: normalizedTestSteps,
     });
-  // reset jira validation for fresh edit
-  setJiraKeyStatus('idle');
-  setJiraKeyMessage('');
+    // reset jira validation for fresh edit
+    setJiraKeyStatus("idle");
+    setJiraKeyMessage("");
     setEditDialogOpen(true);
   };
 
@@ -162,8 +168,10 @@ const TestCaseReviewPage: React.FC = () => {
     // Validate test steps
     const errors: string[] = [];
     // If Jira key is provided but not validated as 'valid', block save
-    if ((editForm.jira_issue_key || '').trim() && jiraKeyStatus !== 'valid') {
-      enqueueSnackbar("Please validate the Jira Issue Key before saving.", { variant: "warning" });
+    if ((editForm.jira_issue_key || "").trim() && jiraKeyStatus !== "valid") {
+      enqueueSnackbar("Please validate the Jira Issue Key before saving.", {
+        variant: "warning",
+      });
       return;
     }
 
@@ -203,7 +211,9 @@ const TestCaseReviewPage: React.FC = () => {
     if (normalizedEditForm.jira_issue_key) {
       const jiraFormat = /^[A-Z][A-Z0-9]+-\d+$/; // e.g., PROJ-123
       if (!jiraFormat.test(normalizedEditForm.jira_issue_key)) {
-        enqueueSnackbar("Invalid Jira Issue Key format (expected ABC-123).", { variant: "warning" });
+        enqueueSnackbar("Invalid Jira Issue Key format (expected ABC-123).", {
+          variant: "warning",
+        });
         return;
       }
     }
@@ -334,38 +344,19 @@ const TestCaseReviewPage: React.FC = () => {
       return;
     }
 
-    // Validate test case content for Zephyr
-    const validationErrors = ZephyrService.validateTestCaseForZephyr(testCase, normalizedJiraId);
+    // Validate test case content for Zephyr using the hook
+    const validationErrors = validateTestCaseForZephyr(testCase, normalizedJiraId);
     if (validationErrors.length > 0) {
       enqueueSnackbar(`Cannot push: ${validationErrors.join("; ")}`, { variant: "error" });
       return;
     }
 
     try {
-      // mark this test case as pushing so the UI can show a loader
-      setPushingId(testCase.id?.toString() || null);
-      // Format the request according to backend API
-      const request = ZephyrService.formatTestCaseForZephyr(testCase, normalizedJiraId);
-
-      //Check for correct format of request
-      console.log("Formatted request for Zephyr:", request);
-      // Push to Zephyr
-      const response = await ZephyrService.pushTestCase(request);
-
-      enqueueSnackbar(
-  `Test case pushed to Zephyr successfully! Test case key: ${response.testcase_key} (linked to ${normalizedJiraId})`,
-        { variant: "success" }
-      );
+      // Use the new method with UI duplicate handling
+      await pushTestCaseWithUI(testCase, normalizedJiraId);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to push to Zephyr Scale";
-      enqueueSnackbar(`Error: ${message}`, { variant: "error" });
-    }
-    finally {
-      // clear pushing state regardless of result
-      setPushingId(null);
+      // Error handling is done automatically by the hook
+      console.error('Push to Zephyr failed:', error);
     }
   };
 
@@ -635,7 +626,7 @@ const TestCaseReviewPage: React.FC = () => {
                         <Button
                           size="small"
                           startIcon={
-                            pushingId === testCase.id?.toString() ? (
+                            zephyrLoading ? (
                               <CircularProgress size={18} color="inherit" />
                             ) : (
                               <PushIcon />
@@ -643,9 +634,9 @@ const TestCaseReviewPage: React.FC = () => {
                           }
                           variant="contained"
                           onClick={() => handlePushToZephyr(testCase)}
-                          disabled={pushingId !== null}
+                          disabled={zephyrLoading}
                         >
-                          {pushingId === testCase.id?.toString() ? 'Pushing...' : 'Push to Zephyr'}
+                          {zephyrLoading ? 'Pushing...' : 'Push to Zephyr'}
                         </Button>
                         <Button
                           size="small"
