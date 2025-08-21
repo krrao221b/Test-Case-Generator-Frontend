@@ -74,6 +74,17 @@ const TestCaseReviewPage: React.FC = () => {
   >('idle');
   const [jiraKeyMessage, setJiraKeyMessage] = useState<string>("");
 
+  // Helper function to check if restricted fields (Description, Feature Description, Acceptance Criteria) are modified
+  const areRestrictedFieldsModified = () => {
+    if (!selectedTestCase) return false;
+    
+    const descriptionChanged = (editForm.description || '').trim() !== (selectedTestCase.description || '').trim();
+    const featureDescChanged = (editForm.feature_description || '').trim() !== (selectedTestCase.feature_description || '').trim();
+    const acceptanceCriteriaChanged = (editForm.acceptance_criteria || '').trim() !== (selectedTestCase.acceptance_criteria || '').trim();
+    
+    return descriptionChanged || featureDescChanged || acceptanceCriteriaChanged;
+  };
+
   // Search params and location
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -824,6 +835,16 @@ const TestCaseReviewPage: React.FC = () => {
                   setEditForm({ ...editForm, description: e.target.value })
                 }
                 placeholder="High-level description of this test case"
+                helperText={
+                  areRestrictedFieldsModified() && 
+                  (editForm.description || '').trim() !== (selectedTestCase?.description || '').trim()
+                    ? "⚠️ Editing this field requires 'Save as New' - cannot update existing test case"
+                    : ""
+                }
+                error={
+                  areRestrictedFieldsModified() && 
+                  (editForm.description || '').trim() !== (selectedTestCase?.description || '').trim()
+                }
               />
             </Grid>
 
@@ -842,6 +863,16 @@ const TestCaseReviewPage: React.FC = () => {
                   })
                 }
                 placeholder="What part of the product this test covers"
+                helperText={
+                  areRestrictedFieldsModified() && 
+                  (editForm.feature_description || '').trim() !== (selectedTestCase?.feature_description || '').trim()
+                    ? "⚠️ Editing this field requires 'Save as New' - cannot update existing test case"
+                    : ""
+                }
+                error={
+                  areRestrictedFieldsModified() && 
+                  (editForm.feature_description || '').trim() !== (selectedTestCase?.feature_description || '').trim()
+                }
               />
             </Grid>
 
@@ -860,6 +891,16 @@ const TestCaseReviewPage: React.FC = () => {
                   })
                 }
                 placeholder="List the criteria that must be met for pass"
+                helperText={
+                  areRestrictedFieldsModified() && 
+                  (editForm.acceptance_criteria || '').trim() !== (selectedTestCase?.acceptance_criteria || '').trim()
+                    ? "⚠️ Editing this field requires 'Save as New' - cannot update existing test case"
+                    : ""
+                }
+                error={
+                  areRestrictedFieldsModified() && 
+                  (editForm.acceptance_criteria || '').trim() !== (selectedTestCase?.acceptance_criteria || '').trim()
+                }
               />
             </Grid>
 
@@ -1037,17 +1078,28 @@ const TestCaseReviewPage: React.FC = () => {
           >
             Save as New
           </Button>
-          <Button
-            onClick={handleSaveEdit}
-            variant="contained"
-            disabled={
-              !editForm.title?.trim() ||
-              !editForm.test_steps?.length ||
-              (((editForm.jira_issue_key || '').trim().length > 0) && jiraKeyStatus !== 'valid')
+          <Tooltip 
+            title={
+              areRestrictedFieldsModified() 
+                ? "Cannot save changes to Description, Feature Description, or Acceptance Criteria. Use 'Save as New' instead."
+                : ""
             }
           >
-            Save Changes
-          </Button>
+            <span>
+              <Button
+                onClick={handleSaveEdit}
+                variant="contained"
+                disabled={
+                  !editForm.title?.trim() ||
+                  !editForm.test_steps?.length ||
+                  (((editForm.jira_issue_key || '').trim().length > 0) && jiraKeyStatus !== 'valid') ||
+                  areRestrictedFieldsModified()
+                }
+              >
+                Save Changes
+              </Button>
+            </span>
+          </Tooltip>
         </DialogActions>
       </Dialog>
 
