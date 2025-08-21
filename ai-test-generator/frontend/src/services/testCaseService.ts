@@ -159,6 +159,64 @@ export class TestCaseService {
   }
 
   /**
+   * Save an existing test case as a new copy (backend endpoint: {id}/save-as-new)
+   */
+  static async saveAsNew(id: string, testCase: Partial<TestCase>): Promise<TestCase> {
+    try {
+      const endpoint = `${API_ENDPOINTS.TEST_CASE_BY_ID(id)}/save-as-new`;
+      // Construct backend-specific request payload
+      const allowedStatuses = new Set(["draft", "active", "deprecated"]);
+      const normalizedStatus = testCase.status
+        ? String(testCase.status).trim().toLowerCase()
+        : undefined;
+
+      const payload = {
+        base_test_case_id: Number(id),
+        title: testCase.title ?? undefined,
+        description: testCase.description ?? undefined,
+        feature_description: testCase.feature_description ?? undefined,
+        acceptance_criteria: testCase.acceptance_criteria ?? undefined,
+        priority: testCase.priority
+          ? (String(testCase.priority).toLowerCase() as TestCase["priority"])
+          : undefined,
+        status: normalizedStatus && allowedStatuses.has(normalizedStatus)
+          ? normalizedStatus
+          : undefined,
+        tags: testCase.tags ?? undefined,
+        preconditions: testCase.preconditions ?? undefined,
+        test_steps: testCase.test_steps ?? undefined,
+        expected_result: testCase.expected_result ?? undefined,
+        jira_issue_key: testCase.jira_issue_key
+          ? String(testCase.jira_issue_key).trim().toUpperCase()
+          : undefined,
+        // Explicitly bypass duplicate/skip logic for this flow
+        force_save: true,
+      };
+
+      const response = await apiClient.post<any>(endpoint, payload);
+      if (!response.success) {
+        throw new Error(response.error || "Failed to save as new test case");
+      }
+
+      // The backend responds with SaveAsNewTestCaseResponse { test_case, cloned_from_id, message }
+      const data: any = response.data;
+      if (data && data.test_case) {
+        return data.test_case as TestCase;
+      }
+      // In case the backend wrapped again or the client wrapped differently
+      if (data && data.data && data.data.test_case) {
+        return data.data.test_case as TestCase;
+      }
+
+      // Fallback: if server returned a TestCase directly
+      return data as TestCase;
+    } catch (error) {
+      console.error("Error saving as new test case:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Delete a test case
    */
   static async deleteTestCase(id: string): Promise<void> {

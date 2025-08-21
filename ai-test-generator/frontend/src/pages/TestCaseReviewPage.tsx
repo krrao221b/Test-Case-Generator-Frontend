@@ -8,6 +8,7 @@ import {
   Button,
   Chip,
   Alert,
+  Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -19,6 +20,10 @@ import {
   MenuItem,
   CircularProgress,
   Pagination,
+  InputAdornment,
+  IconButton,
+  Divider,
+  Stack,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -26,6 +31,10 @@ import {
   CloudUpload as PushIcon,
   Add as AddIcon,
   Remove as RemoveIcon,
+  Link as LinkIcon,
+  HelpOutline as HelpIcon,
+  CheckCircle as CheckCircleIcon,
+  ErrorOutline as ErrorOutlineIcon,
 } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
 import { useSearchParams, useLocation } from "react-router-dom";
@@ -34,7 +43,8 @@ import { useSearchParams, useLocation } from "react-router-dom";
 import TestCasePreview from "../components/TestCasePreview";
 
 // Services
-import { TestCaseService, ZephyrService } from "../services";
+import { TestCaseService, ZephyrService, JiraService } from "../services";
+import { useZephyr } from "../hooks/useZephyr";
 
 // Types
 import type { TestCase, TestStep } from "../types";
@@ -43,6 +53,11 @@ const ITEMS_PER_PAGE = 5;
 
 const TestCaseReviewPage: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar();
+  const {
+    loading: zephyrLoading,
+    pushTestCaseWithUI,
+    validateTestCase: validateTestCaseForZephyr,
+  } = useZephyr();
 
   // State
   const [testCases, setTestCases] = useState<TestCase[]>([]);
@@ -52,6 +67,9 @@ const TestCaseReviewPage: React.FC = () => {
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  // Saving state to block actions/exit while awaiting response
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [savingAction, setSavingAction] = useState<"edit" | "new" | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -59,6 +77,22 @@ const TestCaseReviewPage: React.FC = () => {
   // Form state for editing
   const [editForm, setEditForm] = useState<Partial<TestCase>>({});
   const [pushingId, setPushingId] = useState<string | null>(null);
+  // Jira key validation state
+  const [jiraKeyStatus, setJiraKeyStatus] = useState<
+    "idle" | "checking" | "valid" | "invalid"
+  >("idle");
+  const [jiraKeyMessage, setJiraKeyMessage] = useState<string>("");
+
+  // Helper function to check if restricted fields (Description, Feature Description, Acceptance Criteria) are modified
+  const areRestrictedFieldsModified = () => {
+    if (!selectedTestCase) return false;
+    
+    const descriptionChanged = (editForm.description || '').trim() !== (selectedTestCase.description || '').trim();
+    const featureDescChanged = (editForm.feature_description || '').trim() !== (selectedTestCase.feature_description || '').trim();
+    const acceptanceCriteriaChanged = (editForm.acceptance_criteria || '').trim() !== (selectedTestCase.acceptance_criteria || '').trim();
+    
+    return descriptionChanged || featureDescChanged || acceptanceCriteriaChanged;
+  };
 
   // Search params and location
   const [searchParams] = useSearchParams();
@@ -125,6 +159,9 @@ const TestCaseReviewPage: React.FC = () => {
       ...testCase,
       test_steps: normalizedTestSteps,
     });
+    // reset jira validation for fresh edit
+    setJiraKeyStatus("idle");
+    setJiraKeyMessage("");
     setEditDialogOpen(true);
   };
 
@@ -133,6 +170,13 @@ const TestCaseReviewPage: React.FC = () => {
 
     // Validate test steps
     const errors: string[] = [];
+    // If Jira key is provided but not validated as 'valid', block save
+    if ((editForm.jira_issue_key || "").trim() && jiraKeyStatus !== "valid") {
+      enqueueSnackbar("Please validate the Jira Issue Key before saving.", {
+        variant: "warning",
+      });
+      return;
+    }
 
     if (!editForm.title?.trim()) {
       errors.push("Title is required");
@@ -158,8 +202,29 @@ const TestCaseReviewPage: React.FC = () => {
       return;
     }
 
+    // Normalize fields (e.g., Jira key)
+    const normalizedEditForm: Partial<TestCase> = {
+      ...editForm,
+      jira_issue_key: editForm.jira_issue_key
+        ? editForm.jira_issue_key.trim().toUpperCase()
+        : editForm.jira_issue_key,
+    };
+
+    // Basic Jira key validation if provided
+    if (normalizedEditForm.jira_issue_key) {
+      const jiraFormat = /^[A-Z][A-Z0-9]+-\d+$/; // e.g., PROJ-123
+      if (!jiraFormat.test(normalizedEditForm.jira_issue_key)) {
+        enqueueSnackbar("Invalid Jira Issue Key format (expected ABC-123).", {
+          variant: "warning",
+        });
+        return;
+      }
+    }
+
     try {
-      const updatedTestCase = await TestCaseService.saveTestCase(editForm);
+      setIsSaving(true);
+      setSavingAction("edit");
+      const updatedTestCase = await TestCaseService.saveTestCase(normalizedEditForm);
       setTestCases(
         testCases.map((tc) => (tc.id === editForm.id ? updatedTestCase : tc))
       );
@@ -169,6 +234,56 @@ const TestCaseReviewPage: React.FC = () => {
       const message =
         error instanceof Error ? error.message : "Failed to update test case";
       enqueueSnackbar(`Error: ${message}`, { variant: "error" });
+    } finally {
+      setIsSaving(false);
+      setSavingAction(null);
+    }
+  };
+
+  // Save current edits as a brand-new test case (no overwrite)
+  const handleSaveAsNew = async () => {
+    if (!selectedTestCase?.id) return;
+    // Validate minimal requirements
+    const errors: string[] = [];
+    if (!editForm.title?.trim()) {
+      errors.push("Title is required");
+    }
+    if (!editForm.test_steps || editForm.test_steps.length === 0) {
+      errors.push("At least one test step is required");
+    } else {
+      editForm.test_steps.forEach((step, index) => {
+        if (!step.action?.trim()) {
+          errors.push(`Step ${index + 1}: Action is required`);
+        }
+        if (!step.expected_result?.trim()) {
+          errors.push(`Step ${index + 1}: Expected result is required`);
+        }
+      });
+    }
+    if (errors.length > 0) {
+      enqueueSnackbar(`Validation errors: ${errors.join(", ")}`, { variant: "error" });
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setSavingAction("new");
+      const newTestCase = await TestCaseService.saveAsNew(
+        selectedTestCase.id.toString(),
+        editForm
+      );
+      // Add to top and highlight
+      setTestCases([newTestCase, ...testCases]);
+      setHighlightedTestCaseId(newTestCase.id?.toString() || null);
+      setShouldScrollToHighlighted(true);
+      setEditDialogOpen(false);
+      enqueueSnackbar("Saved as a new test case", { variant: "success" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save as new";
+      enqueueSnackbar(`Error: ${message}`, { variant: "error" });
+    } finally {
+      setIsSaving(false);
+      setSavingAction(null);
     }
   };
 
@@ -225,37 +340,36 @@ const TestCaseReviewPage: React.FC = () => {
       }
     }
 
-    if (!jiraId) {
+    const normalizedJiraId = (jiraId || "").trim().toUpperCase();
+
+    if (!normalizedJiraId) {
       enqueueSnackbar(
-        "No JIRA issue key found. Please ensure the test case is linked to a JIRA ticket.",
+        "No JIRA issue key found. Please update the test case to be linked to a JIRA ticket.",
         { variant: "warning" }
       );
       return;
     }
 
-    try {
-      // mark this test case as pushing so the UI can show a loader
-      setPushingId(testCase.id?.toString() || null);
-      // Format the request according to backend API
-      const request = ZephyrService.formatTestCaseForZephyr(testCase, jiraId);
-
-      // Push to Zephyr
-      const response = await ZephyrService.pushTestCase(request);
-
-      enqueueSnackbar(
-        `Test case pushed to Zephyr successfully! Test case key: ${response.testcase_key} (linked to ${jiraId})`,
-        { variant: "success" }
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to push to Zephyr Scale";
-      enqueueSnackbar(`Error: ${message}`, { variant: "error" });
+    // Validate Jira key format
+    const jiraFormat = /^[A-Z][A-Z0-9]+-\d+$/;
+    if (!jiraFormat.test(normalizedJiraId)) {
+      enqueueSnackbar("Invalid Jira Issue Key format (expected ABC-123).", { variant: "warning" });
+      return;
     }
-    finally {
-      // clear pushing state regardless of result
-      setPushingId(null);
+
+    // Validate test case content for Zephyr using the hook
+    const validationErrors = validateTestCaseForZephyr(testCase, normalizedJiraId);
+    if (validationErrors.length > 0) {
+      enqueueSnackbar(`Cannot push: ${validationErrors.join("; ")}`, { variant: "error" });
+      return;
+    }
+
+    try {
+      // Use the new method with UI duplicate handling
+      await pushTestCaseWithUI(testCase, normalizedJiraId);
+    } catch (error) {
+      // Error handling is done automatically by the hook
+      console.error('Push to Zephyr failed:', error);
     }
   };
 
@@ -525,7 +639,7 @@ const TestCaseReviewPage: React.FC = () => {
                         <Button
                           size="small"
                           startIcon={
-                            pushingId === testCase.id?.toString() ? (
+                            zephyrLoading ? (
                               <CircularProgress size={18} color="inherit" />
                             ) : (
                               <PushIcon />
@@ -533,9 +647,9 @@ const TestCaseReviewPage: React.FC = () => {
                           }
                           variant="contained"
                           onClick={() => handlePushToZephyr(testCase)}
-                          disabled={pushingId !== null}
+                          disabled={zephyrLoading}
                         >
-                          {pushingId === testCase.id?.toString() ? 'Pushing...' : 'Push to Zephyr'}
+                          {zephyrLoading ? 'Pushing...' : 'Push to Zephyr'}
                         </Button>
                         <Button
                           size="small"
@@ -573,34 +687,159 @@ const TestCaseReviewPage: React.FC = () => {
       {/* Edit Dialog (unchanged) */}
       <Dialog
         open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
+        onClose={(e, reason) => {
+          // Block closing via backdrop/escape while saving
+          if (isSaving && (reason === "backdropClick" || reason === "escapeKeyDown")) {
+            return;
+          }
+          setEditDialogOpen(false);
+        }}
         maxWidth="lg"
         fullWidth
+        disableEscapeKeyDown={isSaving}
       >
         <DialogTitle>Edit Test Case</DialogTitle>
         <DialogContent>
+          {/* Disable all inputs while saving */}
+          <Box component="fieldset" disabled={isSaving} sx={{ border: 0, p: 0, m: 0 }}>
           <Grid container spacing={2} sx={{ mt: 1 }}>
+            {/* Jira tip and key go first for visibility */}
+            <Grid item xs={12}>
+              <Alert severity="info" sx={{ mb: 1 }}>
+                Optional: Link a Jira Issue Key (e.g., PROJ-123) to enable pushing this test case to Zephyr.
+              </Alert>
+            </Grid>
+
+            {/* Prominent Jira Issue Key field */}
+            <Grid item xs={12} md={6}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 1,
+                  border: (theme) => `1px solid ${theme.palette.divider}`,
+                  borderLeft: (theme) => `4px solid ${
+                    jiraKeyStatus === 'valid'
+                      ? theme.palette.success.main
+                      : jiraKeyStatus === 'invalid'
+                      ? theme.palette.error.main
+                      : theme.palette.primary.main
+                  }`,
+                  // keep background clean per best practices; use field states instead
+                  backgroundColor: 'transparent',
+                }}
+              >
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Jira Issue Key (optional)"
+                  placeholder="PROJ-123"
+                  value={editForm.jira_issue_key || ""}
+                  onChange={(e) =>
+                    {
+                      setEditForm({ ...editForm, jira_issue_key: e.target.value });
+                      setJiraKeyStatus('idle');
+                      setJiraKeyMessage('');
+                    }
+                  }
+                  error={jiraKeyStatus === 'invalid'}
+                  color={jiraKeyStatus === 'valid' ? 'success' : 'primary'}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Tooltip title={jiraKeyStatus === 'checking' ? 'Checking…' : 'Validate Jira key'}>
+                          <span>
+                            <IconButton
+                              aria-label="validate jira key"
+                              size="small"
+                              color={jiraKeyStatus === 'invalid' ? 'error' : jiraKeyStatus === 'valid' ? 'success' : 'primary'}
+                              disabled={jiraKeyStatus === 'checking' || !(editForm.jira_issue_key || '').trim()}
+                              onClick={async () => {
+                                const raw = (editForm.jira_issue_key || '').trim().toUpperCase();
+                                if (!raw) return;
+                                // quick format check
+                                const fmt = /^[A-Z][A-Z0-9]+-\d+$/;
+                                if (!fmt.test(raw)) {
+                                  setJiraKeyStatus('invalid');
+                                  setJiraKeyMessage('Invalid format (expected ABC-123).');
+                                  return;
+                                }
+                                setJiraKeyStatus('checking');
+                                setJiraKeyMessage('');
+                                try {
+                                  // call backend without similar cases
+                                  await JiraService.getTicket(raw, { includeSimilar: false });
+                                  setJiraKeyStatus('valid');
+                                  setJiraKeyMessage('Ticket exists');
+                                } catch (err: any) {
+                                  const status = err?.status ?? err?.originalError?.status;
+                                  if (status === 404) {
+                                    setJiraKeyStatus('invalid');
+                                    setJiraKeyMessage('Ticket not found');
+                                  } else {
+                                    setJiraKeyStatus('invalid');
+                                    setJiraKeyMessage(err?.message || 'Failed to verify');
+                                  }
+                                }
+                              }}
+                            >
+                              {jiraKeyStatus === 'valid' ? (
+                                <CheckCircleIcon fontSize="small" />
+                              ) : jiraKeyStatus === 'invalid' ? (
+                                <ErrorOutlineIcon fontSize="small" />
+                              ) : (
+                                <LinkIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Tooltip title="Format: ABC-123. Not required, but needed for Zephyr push.">
+                          <HelpIcon fontSize="small" />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                  helperText={
+                    jiraKeyStatus === 'invalid'
+                      ? (jiraKeyMessage || 'Invalid Jira issue key.')
+                      : jiraKeyStatus === 'valid'
+                        ? 'Looks good. This ticket exists.'
+                        : 'Format: ABC-123 (e.g., SCRUM-42).'
+                  }
+                />
+              </Box>
+            </Grid>
+
             {/* Basic Information */}
             <Grid item xs={12}>
               <Typography variant="h6" gutterBottom>
                 Basic Information
               </Typography>
+              <Divider />
             </Grid>
 
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
+                autoFocus
+                required
                 label="Title"
                 value={editForm.title || ""}
                 onChange={(e) =>
                   setEditForm({ ...editForm, title: e.target.value })
                 }
+                helperText={!editForm.title?.trim() ? "Title is required" : " "}
               />
             </Grid>
 
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
                 multiline
                 rows={3}
                 label="Description"
@@ -608,12 +847,24 @@ const TestCaseReviewPage: React.FC = () => {
                 onChange={(e) =>
                   setEditForm({ ...editForm, description: e.target.value })
                 }
+                placeholder="High-level description of this test case"
+                helperText={
+                  areRestrictedFieldsModified() && 
+                  (editForm.description || '').trim() !== (selectedTestCase?.description || '').trim()
+                    ? "⚠️ Editing this field requires 'Save as New' - cannot update existing test case"
+                    : ""
+                }
+                error={
+                  areRestrictedFieldsModified() && 
+                  (editForm.description || '').trim() !== (selectedTestCase?.description || '').trim()
+                }
               />
             </Grid>
 
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
                 multiline
                 rows={2}
                 label="Feature Description"
@@ -624,12 +875,24 @@ const TestCaseReviewPage: React.FC = () => {
                     feature_description: e.target.value,
                   })
                 }
+                placeholder="What part of the product this test covers"
+                helperText={
+                  areRestrictedFieldsModified() && 
+                  (editForm.feature_description || '').trim() !== (selectedTestCase?.feature_description || '').trim()
+                    ? "⚠️ Editing this field requires 'Save as New' - cannot update existing test case"
+                    : ""
+                }
+                error={
+                  areRestrictedFieldsModified() && 
+                  (editForm.feature_description || '').trim() !== (selectedTestCase?.feature_description || '').trim()
+                }
               />
             </Grid>
 
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
                 multiline
                 rows={3}
                 label="Acceptance Criteria"
@@ -640,13 +903,25 @@ const TestCaseReviewPage: React.FC = () => {
                     acceptance_criteria: e.target.value,
                   })
                 }
+                placeholder="List the criteria that must be met for pass"
+                helperText={
+                  areRestrictedFieldsModified() && 
+                  (editForm.acceptance_criteria || '').trim() !== (selectedTestCase?.acceptance_criteria || '').trim()
+                    ? "⚠️ Editing this field requires 'Save as New' - cannot update existing test case"
+                    : ""
+                }
+                error={
+                  areRestrictedFieldsModified() && 
+                  (editForm.acceptance_criteria || '').trim() !== (selectedTestCase?.acceptance_criteria || '').trim()
+                }
               />
             </Grid>
 
             <Grid item xs={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth size="small">
                 <InputLabel>Priority</InputLabel>
                 <Select
+                  size="small"
                   value={editForm.priority || "medium"}
                   label="Priority"
                   onChange={(e) =>
@@ -665,9 +940,10 @@ const TestCaseReviewPage: React.FC = () => {
             </Grid>
 
             <Grid item xs={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth size="small">
                 <InputLabel>Status</InputLabel>
                 <Select
+                  size="small"
                   value={editForm.status || "draft"}
                   label="Status"
                   onChange={(e) =>
@@ -683,24 +959,13 @@ const TestCaseReviewPage: React.FC = () => {
 
             {/* Test Steps Section */}
             <Grid item xs={12} sx={{ mt: 3 }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
                 <Typography variant="h6">Test Steps</Typography>
-                <Button
-                  startIcon={<AddIcon />}
-                  variant="outlined"
-                  size="small"
-                  onClick={addTestStep}
-                >
+                <Button startIcon={<AddIcon />} variant="outlined" size="small" onClick={addTestStep}>
                   Add Step
                 </Button>
-              </Box>
+              </Stack>
+              <Divider />
             </Grid>
 
             {/* Test Steps List */}
@@ -782,6 +1047,7 @@ const TestCaseReviewPage: React.FC = () => {
             <Grid item xs={12} sx={{ mt: 2 }}>
               <TextField
                 fullWidth
+                size="small"
                 multiline
                 rows={2}
                 label="Overall Expected Result"
@@ -789,6 +1055,7 @@ const TestCaseReviewPage: React.FC = () => {
                 onChange={(e) =>
                   setEditForm({ ...editForm, expected_result: e.target.value })
                 }
+                placeholder="What should be true at the end of this test"
               />
             </Grid>
 
@@ -796,6 +1063,7 @@ const TestCaseReviewPage: React.FC = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
+                size="small"
                 label="Tags (comma-separated)"
                 value={editForm.tags?.join(", ") || ""}
                 onChange={(e) =>
@@ -808,20 +1076,51 @@ const TestCaseReviewPage: React.FC = () => {
                   })
                 }
                 placeholder="authentication, login, security"
+                helperText="Use commas to separate tags"
               />
             </Grid>
           </Grid>
+          </Box>
         </DialogContent>
 
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setEditDialogOpen(false)} disabled={isSaving}>Cancel</Button>
           <Button
-            onClick={handleSaveEdit}
-            variant="contained"
-            disabled={!editForm.title?.trim() || !editForm.test_steps?.length}
+            onClick={handleSaveAsNew}
+            variant="outlined"
+            disabled={
+              isSaving ||
+              !editForm.title?.trim() ||
+              !editForm.test_steps?.length
+            }
+            startIcon={isSaving && savingAction === "new" ? <CircularProgress size={18} /> : undefined}
           >
-            Save Changes
+            {isSaving && savingAction === "new" ? "Saving…" : "Save as New"}
           </Button>
+          <Tooltip 
+            title={
+              areRestrictedFieldsModified() 
+                ? "Cannot save changes to Description, Feature Description, or Acceptance Criteria. Use 'Save as New' instead."
+                : ""
+            }
+          >
+            <span>
+              <Button
+                onClick={handleSaveEdit}
+                variant="contained"
+                disabled={
+                  isSaving ||
+                  !editForm.title?.trim() ||
+                  !editForm.test_steps?.length ||
+                  (((editForm.jira_issue_key || '').trim().length > 0) && jiraKeyStatus !== 'valid') ||
+                  areRestrictedFieldsModified()
+                }
+                startIcon={isSaving && savingAction === "edit" ? <CircularProgress size={18} color="inherit" /> : undefined}
+              >
+                {isSaving && savingAction === "edit" ? "Saving…" : "Save Changes"}
+              </Button>
+            </span>
+          </Tooltip>
         </DialogActions>
       </Dialog>
 
