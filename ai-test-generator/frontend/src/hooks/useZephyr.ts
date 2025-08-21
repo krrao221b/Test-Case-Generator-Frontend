@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { ZephyrService } from '../services';
-import type { TestCase, ZephyrPushRequest, ZephyrPushResponse, DuplicateTestCaseError, ZephyrError } from '../types';
+import type { TestCase, ZephyrPushRequest, ZephyrPushResponse, DuplicateTestCaseError } from '../types';
 import { useSnackbar } from 'notistack';
 import DuplicateTestCaseModal from '../components/DuplicateTestCaseModal';
 import React from 'react';

@@ -43,7 +43,7 @@ import { useSearchParams, useLocation } from "react-router-dom";
 import TestCasePreview from "../components/TestCasePreview";
 
 // Services
-import { TestCaseService, ZephyrService, JiraService } from "../services";
+import { TestCaseService, JiraService } from "../services";
 import { useZephyr } from "../hooks/useZephyr";
 
 // Types
@@ -76,7 +76,7 @@ const TestCaseReviewPage: React.FC = () => {
 
   // Form state for editing
   const [editForm, setEditForm] = useState<Partial<TestCase>>({});
-  const [pushingId, setPushingId] = useState<string | null>(null);
+  // const [pushingId, setPushingId] = useState<string | null>(null);
   // Jira key validation state
   const [jiraKeyStatus, setJiraKeyStatus] = useState<
     "idle" | "checking" | "valid" | "invalid"
@@ -687,7 +687,7 @@ const TestCaseReviewPage: React.FC = () => {
       {/* Edit Dialog (unchanged) */}
       <Dialog
         open={editDialogOpen}
-        onClose={(e, reason) => {
+        onClose={(reason) => {
           // Block closing via backdrop/escape while saving
           if (isSaving && (reason === "backdropClick" || reason === "escapeKeyDown")) {
             return;
