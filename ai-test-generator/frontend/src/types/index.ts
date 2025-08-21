@@ -124,3 +124,21 @@ export interface AppSettings {
   defaultPriority: TestCase["priority"];
   maxSimilarTestCases: number;
 }
+
+// Add duplicate test case error interface
+export interface DuplicateTestCaseError {
+  error: string;
+  message: string;
+  type: "DUPLICATE_TEST_CASE";
+  user_action: "EDIT_NAME";
+  original_name: string;
+  jira_id: string;
+  suggested_names: string[];
+  instructions: string;
+}
+
+// Add this type for error handling
+export interface ZephyrError extends Error {
+  isDuplicate?: boolean;
+  duplicateData?: DuplicateTestCaseError;
+}
